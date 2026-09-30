@@ -1,0 +1,299 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control for TraceHarvest Portal",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address of the authenticated user"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin", "compliance_officer", "fleet_manager", "inspector"],
+          "description": "Assigned administrative role"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Full display name"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last profile update"
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "Farmer": {
+      "title": "Farmer",
+      "description": "Enrolled smallholder farmer with GPS farm plot and official export identifier",
+      "type": "object",
+      "properties": {
+        "client_uuid": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Client device unique UUID for offline sync idempotency"
+        },
+        "official_farmer_id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Official generated registration ID (e.g. TH-KAN-2026-1048)"
+        },
+        "full_name": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Full name of the farmer"
+        },
+        "phone_number": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Farmer contact telephone number"
+        },
+        "state": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Nigerian state of farm plot (e.g. Kano, Jigawa, Kaduna, Benue)"
+        },
+        "lga": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Local Government Area"
+        },
+        "community": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Village or farming community"
+        },
+        "crop": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Primary agricultural commodity (Sesame, Soybeans, Ginger, Cocoa, Cashew)"
+        },
+        "farm_size_hectares": {
+          "type": "number",
+          "description": "Total plot area in hectares"
+        },
+        "latitude": {
+          "type": "number",
+          "description": "Farm plot GPS latitude centroid"
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Farm plot GPS longitude centroid"
+        },
+        "gps_polygon": {
+          "type": "string",
+          "description": "EUDR GPS polygon boundary coordinates"
+        },
+        "cooperative_name": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Agricultural cooperative union"
+        },
+        "agent_id": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Field agent identifier who enrolled the farmer"
+        },
+        "created_at_epoch_ms": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "eudr_compliant": {
+          "type": "boolean",
+          "description": "Deforestation regulation compliance flag"
+        }
+      },
+      "required": ["client_uuid", "official_farmer_id", "full_name", "state", "crop", "farm_size_hectares", "latitude", "longitude", "agent_id"]
+    },
+    "Practice": {
+      "title": "Practice",
+      "description": "Good Agricultural Practice (GAP) or agrochemical application log",
+      "type": "object",
+      "properties": {
+        "client_uuid": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Unique practice log UUID"
+        },
+        "farmer_client_uuid": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Parent farmer client UUID"
+        },
+        "farmer_code": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Official farmer code (TH-KAN-2026-XXXX)"
+        },
+        "practice_type": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Type of practice (Pesticide, Fertilizer, Soil preparation, Harvesting)"
+        },
+        "product_name": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Commercial product brand name"
+        },
+        "active_ingredient": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Chemical active ingredient"
+        },
+        "dosage": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Applied dosage per hectare"
+        },
+        "quantity_used": {
+          "type": "number",
+          "description": "Numerical quantity"
+        },
+        "quantity_unit": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Unit of measurement (ml, L, kg)"
+        },
+        "date_applied_epoch_ms": {
+          "type": "number",
+          "description": "Application date epoch timestamp"
+        },
+        "pre_harvest_interval_days": {
+          "type": "number",
+          "description": "NAFDAC mandated Pre-Harvest Interval in days"
+        },
+        "nafdac_reg_no": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "NAFDAC registration number"
+        },
+        "nafdac_approved": {
+          "type": "boolean",
+          "description": "Approval status under NAFDAC database"
+        },
+        "risk_level": {
+          "type": "string",
+          "enum": ["COMPLIANT", "FLAGGED_HIGH_RISK", "UNDER_REVIEW"],
+          "description": "Residue risk rating"
+        },
+        "phi_cleared": {
+          "type": "boolean",
+          "description": "Whether PHI countdown has fully elapsed"
+        },
+        "safe_harvest_date_ms": {
+          "type": "number",
+          "description": "Calculated epoch timestamp after which harvest is safe"
+        },
+        "agent_id": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Field agent identifier"
+        }
+      },
+      "required": ["client_uuid", "farmer_client_uuid", "farmer_code", "practice_type", "date_applied_epoch_ms", "agent_id"]
+    },
+    "Batch": {
+      "title": "Batch",
+      "description": "Export consignment aggregation batch with SHA-256 provenance passport",
+      "type": "object",
+      "properties": {
+        "batch_number": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Batch code (e.g. EXP-TH-2026-8910)"
+        },
+        "crop": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Export commodity"
+        },
+        "destination": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Destination port / country (e.g. Rotterdam EU, UK, Houston US)"
+        },
+        "estimated_tonnage": {
+          "type": "number",
+          "description": "Total metric tonnage"
+        },
+        "farmer_count": {
+          "type": "number",
+          "description": "Number of smallholders contributing to consignment"
+        },
+        "export_clearance_status": {
+          "type": "string",
+          "enum": ["PENDING_CLEARANCE", "CERTIFIED_COMPLIANT", "FLAGGED_QUARANTINE"],
+          "description": "Export status"
+        },
+        "tamper_proof_sha256": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "SHA-256 cryptographic hash of consignment chain"
+        },
+        "created_at_ms": {
+          "type": "number",
+          "description": "Batch creation timestamp"
+        }
+      },
+      "required": ["batch_number", "crop", "destination", "estimated_tonnage", "export_clearance_status", "tamper_proof_sha256", "created_at_ms"]
+    },
+    "SyncLog": {
+      "title": "SyncLog",
+      "description": "Record of synchronization session from field agent Android fleet",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Field agent identifier"
+        },
+        "device_timestamp_ms": {
+          "type": "number",
+          "description": "Timestamp on mobile device during sync"
+        },
+        "server_timestamp_ms": {
+          "type": "number",
+          "description": "Timestamp on server when sync was processed"
+        },
+        "farmers_count": {
+          "type": "number",
+          "description": "Farmers synced in batch"
+        },
+        "practices_count": {
+          "type": "number",
+          "description": "Practices synced in batch"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Status string"
+        }
+      },
+      "required": ["agent_id", "server_timestamp_ms", "farmers_count", "practices_count"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "Admin user profile and RBAC role"
+    },
+    "/farmers/{farmerId}": {
+      "schema": { "$ref": "Farmer" },
+      "description": "Enrolled farmer profiles"
+    },
+    "/practices/{practiceId}": {
+      "schema": { "$ref": "Practice" },
+      "description": "Field practices and chemical logs"
+    },
+    "/batches/{batchId}": {
+      "schema": { "$ref": "Batch" },
+      "description": "Export consignment batches"
+    },
+    "/sync_logs/{syncLogId}": {
+      "schema": { "$ref": "SyncLog" },
+      "description": "Mobile fleet sync telemetry"
+    }
+  }
+}

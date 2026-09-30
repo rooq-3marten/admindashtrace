@@ -1,0 +1,173 @@
+{
+  "farmers": {
+    "550e8400-e29b-41d4-a716-446655440000": {
+      "client_uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "full_name": "Musa Ibrahim Dambatta",
+      "phone_number": "+2348034512991",
+      "state": "Kano",
+      "lga": "Dambatta",
+      "community": "Gwarabjawa",
+      "crop": "Sesame",
+      "farm_size_hectares": 4.5,
+      "latitude": 12.4382,
+      "longitude": 8.5147,
+      "gps_polygon": "12.4374,8.5131;12.4374,8.5163;12.4342,8.5163;12.4342,8.5131",
+      "cooperative_name": "Dambatta Sesame Growers Union",
+      "agent_id": "AGENT-NG-042",
+      "created_at_epoch_ms": 1727693000000,
+      "official_farmer_id": "TH-KAN-2026-4781",
+      "server_received_at": 1790770172425
+    },
+    "test-farmer-sync-9901": {
+      "client_uuid": "test-farmer-sync-9901",
+      "full_name": "Garba Aliyu Dambatta",
+      "phone_number": "+2348039988112",
+      "state": "Kano",
+      "lga": "Dambatta",
+      "community": "Fagwalawa",
+      "crop": "Sesame",
+      "farm_size_hectares": 5,
+      "latitude": 12.4412,
+      "longitude": 8.5204,
+      "gps_polygon": "12.4400,8.5190;12.4400,8.5220;12.4430,8.5220;12.4430,8.5190",
+      "cooperative_name": "Dambatta Sesame Growers Union",
+      "agent_id": "AGENT-NG-042",
+      "created_at_epoch_ms": 1790775980000,
+      "official_farmer_id": "TH-KAN-2026-5731",
+      "server_received_at": 1790775985782
+    }
+  },
+  "practices": [
+    {
+      "client_uuid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "farmer_client_uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "farmer_code": "TH-KAN-2026-4781",
+      "practice_type": "🧪 Pesticide application",
+      "product_name": "Karate 5 EC",
+      "active_ingredient": "Lambda-cyhalothrin (50 g/L EC)",
+      "dosage": "400 ml",
+      "quantity_used": 400,
+      "quantity_unit": "ml",
+      "date_applied_epoch_ms": 1727089200000,
+      "pre_harvest_interval_days": 14,
+      "nafdac_reg_no": "04-2015",
+      "nafdac_approved": true,
+      "gps_coordinates": "12.4382°N, 8.5147°E",
+      "risk_level": "COMPLIANT",
+      "agent_id": "AGENT-NG-042",
+      "phi_cleared": true,
+      "safe_harvest_date_ms": 1728298800000,
+      "server_received_at": 1790770172425
+    },
+    {
+      "client_uuid": "test-practice-sync-9901",
+      "farmer_client_uuid": "test-farmer-sync-9901",
+      "practice_type": "🧪 Pesticide application",
+      "product_name": "Karate 5 EC",
+      "active_ingredient": "Lambda-cyhalothrin (50 g/L EC)",
+      "dosage": "400 ml/ha",
+      "quantity_used": 2000,
+      "quantity_unit": "ml",
+      "date_applied_epoch_ms": 1790775980000,
+      "pre_harvest_interval_days": 14,
+      "nafdac_reg_no": "04-2015",
+      "gps_coordinates": "12.4412°N, 8.5204°E",
+      "agent_id": "AGENT-NG-042",
+      "farmer_code": "TH-KAN-2026-5731",
+      "risk_level": "COMPLIANT",
+      "nafdac_approved": true,
+      "phi_cleared": false,
+      "safe_harvest_date_ms": 1791985580000,
+      "server_received_at": 1790775985782
+    }
+  ],
+  "batches": [],
+  "syncLogs": [
+    {
+      "id": "sync-1790775997320",
+      "agent_id": "AGENT-NG-042",
+      "device_timestamp_ms": 1790775997320,
+      "server_timestamp_ms": 1790775997320,
+      "farmers_count": 1,
+      "practices_count": 0,
+      "status": "COMPLETED"
+    },
+    {
+      "id": "sync-1790775985782",
+      "agent_id": "AGENT-NG-042",
+      "device_timestamp_ms": 1790775980000,
+      "server_timestamp_ms": 1790775985782,
+      "farmers_count": 1,
+      "practices_count": 1,
+      "status": "COMPLETED"
+    },
+    {
+      "id": "sync-1790770177072",
+      "agent_id": "AGENT-NG-042",
+      "device_timestamp_ms": 1727694000000,
+      "server_timestamp_ms": 1790770177072,
+      "farmers_count": 1,
+      "practices_count": 1,
+      "status": "COMPLETED"
+    },
+    {
+      "id": "sync-1790770172425",
+      "agent_id": "AGENT-NG-042",
+      "device_timestamp_ms": 1727694000000,
+      "server_timestamp_ms": 1790770172425,
+      "farmers_count": 1,
+      "practices_count": 1,
+      "status": "COMPLETED"
+    }
+  ],
+  "agents": {
+    "AGENT-NG-042": {
+      "agent_id": "AGENT-NG-042",
+      "name": "Haruna Abdullahi",
+      "phone": "+234 802 319 8812",
+      "assigned_state": "Kano",
+      "assigned_lga": "Dambatta",
+      "active_status": "online",
+      "last_sync_epoch_ms": 1790775997320,
+      "battery_level": 84,
+      "total_farmers_enrolled": 50,
+      "total_practices_logged": 113
+    },
+    "AGENT-NG-018": {
+      "agent_id": "AGENT-NG-018",
+      "name": "Zainab Mohammed Bello",
+      "phone": "+234 803 774 2109",
+      "assigned_state": "Jigawa",
+      "assigned_lga": "Dutse",
+      "active_status": "online",
+      "last_sync_epoch_ms": 1790773920751,
+      "battery_level": 71,
+      "total_farmers_enrolled": 35,
+      "total_practices_logged": 89
+    },
+    "AGENT-NG-091": {
+      "agent_id": "AGENT-NG-091",
+      "name": "Emeka Chukwuemeka",
+      "phone": "+234 814 552 9011",
+      "assigned_state": "Kaduna",
+      "assigned_lga": "Zaria",
+      "active_status": "syncing",
+      "last_sync_epoch_ms": 1790775720751,
+      "battery_level": 92,
+      "total_farmers_enrolled": 52,
+      "total_practices_logged": 130
+    },
+    "AGENT-NG-033": {
+      "agent_id": "AGENT-NG-033",
+      "name": "Tersoo Isaac Aondo",
+      "phone": "+234 809 113 4567",
+      "assigned_state": "Benue",
+      "assigned_lga": "Gboko",
+      "active_status": "offline",
+      "last_sync_epoch_ms": 1790765160751,
+      "battery_level": 45,
+      "total_farmers_enrolled": 29,
+      "total_practices_logged": 64
+    }
+  }
+}

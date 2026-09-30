@@ -1,0 +1,6 @@
+{
+  "name": "TraceHarvest Admin Portal",
+  "description": "Enterprise agricultural traceability admin portal with real-time analytics, RBAC, GIS farm plot mapping, NAFDAC PHI compliance sentinel, and upstream field agent sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

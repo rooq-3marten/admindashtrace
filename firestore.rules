@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Diagnostic connection test endpoint
+    match /test/{testId} {
+      allow read: if true;
+    }
+
+    // Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSuperAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'shekonifarooq@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin')
+      );
+    }
+
+    function isStaff() {
+      return isVerified() && (
+        isSuperAdmin() ||
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      );
+    }
+
+    function isComplianceOfficer() {
+      return isSuperAdmin() || (
+        isVerified() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['compliance_officer', 'super_admin']
+      );
+    }
+
+    // 1. Users / RBAC collection
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role']) &&
+             data.keys().hasOnly(['email', 'role', 'displayName', 'updatedAt']) &&
+             data.email is string && data.email.size() <= 150 &&
+             data.role in ['super_admin', 'compliance_officer', 'fleet_manager', 'inspector'];
+    }
+
+    match /users/{userId} {
+      allow get: if isVerified() && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isStaff();
+      // Only Super Admin can assign roles; new users can bootstrap their own basic profile as inspector
+      allow create: if isVerified() && isValidId(userId) && isValidUser(incoming()) && (
+        isSuperAdmin() || (
+          request.auth.uid == userId &&
+          (incoming().email == 'shekonifarooq@gmail.com' ? incoming().role == 'super_admin' : incoming().role in ['inspector', 'fleet_manager', 'compliance_officer'])
+        )
+      );
+      allow update: if isVerified() && isValidId(userId) && isValidUser(incoming()) && (
+        isSuperAdmin() || (
+          request.auth.uid == userId &&
+          incoming().role == existing().role &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+        )
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. Farmers Registry
+    function isValidFarmer(data) {
+      return data.keys().hasAll(['client_uuid', 'official_farmer_id', 'full_name', 'state', 'crop', 'farm_size_hectares', 'latitude', 'longitude', 'agent_id']) &&
+             data.client_uuid is string && data.client_uuid.size() <= 64 &&
+             data.official_farmer_id is string && data.official_farmer_id.size() <= 64 &&
+             data.full_name is string && data.full_name.size() <= 150 &&
+             data.state is string && data.state.size() <= 50 &&
+             data.crop is string && data.crop.size() <= 50 &&
+             data.farm_size_hectares is number && data.farm_size_hectares >= 0 &&
+             data.latitude is number &&
+             data.longitude is number &&
+             data.agent_id is string && data.agent_id.size() <= 50;
+    }
+
+    match /farmers/{farmerId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(farmerId) && isValidFarmer(incoming());
+      allow update: if isStaff() && isValidId(farmerId) && isValidFarmer(incoming()) && (
+        isSuperAdmin() ||
+        incoming().client_uuid == existing().client_uuid
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // 3. Good Agricultural Practices (GAP) & Chemical Applications
+    function isValidPractice(data) {
+      return data.keys().hasAll(['client_uuid', 'farmer_client_uuid', 'farmer_code', 'practice_type', 'date_applied_epoch_ms', 'agent_id']) &&
+             data.client_uuid is string && data.client_uuid.size() <= 64 &&
+             data.farmer_client_uuid is string && data.farmer_client_uuid.size() <= 64 &&
+             data.farmer_code is string && data.farmer_code.size() <= 64 &&
+             data.practice_type is string && data.practice_type.size() <= 100 &&
+             data.date_applied_epoch_ms is number &&
+             data.agent_id is string && data.agent_id.size() <= 50;
+    }
+
+    match /practices/{practiceId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(practiceId) && isValidPractice(incoming());
+      allow update: if isStaff() && isValidId(practiceId) && isValidPractice(incoming()) && (
+        isComplianceOfficer() ||
+        incoming().client_uuid == existing().client_uuid
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // 4. Export Consignment Batches
+    function isValidBatch(data) {
+      return data.keys().hasAll(['batch_number', 'crop', 'destination', 'estimated_tonnage', 'export_clearance_status', 'tamper_proof_sha256', 'created_at_ms']) &&
+             data.batch_number is string && data.batch_number.size() <= 64 &&
+             data.crop is string && data.crop.size() <= 50 &&
+             data.destination is string && data.destination.size() <= 150 &&
+             data.estimated_tonnage is number && data.estimated_tonnage > 0 &&
+             data.export_clearance_status in ['PENDING_CLEARANCE', 'CERTIFIED_COMPLIANT', 'FLAGGED_QUARANTINE'] &&
+             data.tamper_proof_sha256 is string && data.tamper_proof_sha256.size() <= 64 &&
+             data.created_at_ms is number;
+    }
+
+    match /batches/{batchId} {
+      allow get, list: if isStaff();
+      allow create: if isComplianceOfficer() && isValidId(batchId) && isValidBatch(incoming());
+      allow update: if isComplianceOfficer() && isValidId(batchId) && isValidBatch(incoming()) && (
+        // Once certified, the checksum and batch number are immutable
+        existing().export_clearance_status != 'CERTIFIED_COMPLIANT' || isSuperAdmin()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // 5. Mobile Agent Sync Logs
+    function isValidSyncLog(data) {
+      return data.keys().hasAll(['agent_id', 'server_timestamp_ms', 'farmers_count', 'practices_count']) &&
+             data.agent_id is string && data.agent_id.size() <= 50 &&
+             data.server_timestamp_ms is number &&
+             data.farmers_count is number &&
+             data.practices_count is number;
+    }
+
+    match /sync_logs/{syncLogId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(syncLogId) && isValidSyncLog(incoming());
+      allow update: if false; // Sync logs are append-only audit trail
+      allow delete: if isSuperAdmin();
+    }
+  }
+}
