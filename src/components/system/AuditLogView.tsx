@@ -57,7 +57,18 @@ export const AuditLogView: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => alert('Downloading signed audit trail log (CSV)...')}
+          onClick={() => {
+            let csv = 'Audit ID,Timestamp (UTC),Operator,Action,Target Resource,Justification,Status,Client IP\n';
+            auditEntries.forEach((a) => {
+              csv += `"${a.id}","${a.timestamp}","${a.actor}","${a.action}","${a.resource}","${a.reason}","${a.status}","${a.ip}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `traceharvest_audit_trail_${Date.now()}.csv`;
+            link.click();
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B7F4B] text-white hover:bg-[#145C36] text-xs font-semibold transition cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />

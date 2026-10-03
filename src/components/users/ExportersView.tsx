@@ -35,6 +35,8 @@ export const ExportersView: React.FC = () => {
     },
   ];
 
+  const [selectedExporter, setSelectedExporter] = React.useState<typeof exporters[0] | null>(null);
+
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E5E7EB] dark:border-[#334155] shadow-xs">
@@ -88,7 +90,7 @@ export const ExportersView: React.FC = () => {
                 {exp.totalBatches} Lots Sourced
               </span>
               <button
-                onClick={() => alert(`Opening trading house profile for ${exp.name}...`)}
+                onClick={() => setSelectedExporter(exp)}
                 className="text-[#1B7F4B] dark:text-emerald-400 font-semibold hover:underline cursor-pointer"
               >
                 View Account →
@@ -97,6 +99,74 @@ export const ExportersView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Exporter Account Modal */}
+      {selectedExporter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#1E293B] border border-[#E5E7EB] dark:border-[#334155] shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E5E7EB] dark:border-[#334155]">
+              <div className="flex items-center gap-2">
+                <Building className="w-5 h-5 text-[#1B7F4B]" />
+                <h3 className="font-bold text-lg text-[#111827] dark:text-[#F1F5F9]">
+                  {selectedExporter.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedExporter(null)}
+                className="text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+                <ShieldCheck className="w-4 h-4" />
+                <span className="font-semibold">NEPC Active Export Clearance Verified</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-[#E5E7EB] dark:border-[#334155]">
+                <div>
+                  <span className="text-[#6B7280]">Account Code:</span>
+                  <p className="font-mono font-bold text-[#111827] dark:text-[#F1F5F9]">{selectedExporter.id}</p>
+                </div>
+                <div>
+                  <span className="text-[#6B7280]">Export Terminal:</span>
+                  <p className="font-semibold text-[#111827] dark:text-[#F1F5F9]">{selectedExporter.terminal}</p>
+                </div>
+                <div>
+                  <span className="text-[#6B7280]">Official License:</span>
+                  <p className="font-mono text-[#111827] dark:text-[#F1F5F9]">{selectedExporter.license}</p>
+                </div>
+                <div>
+                  <span className="text-[#6B7280]">Batches Sourced:</span>
+                  <p className="font-mono font-bold text-[#1B7F4B]">{selectedExporter.totalBatches} Lots</p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[#6B7280] block mb-1">Approved Commodities:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedExporter.commodities.map((c) => (
+                    <span key={c} className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[#111827] dark:text-[#F1F5F9] font-medium text-[11px]">
+                      🌾 {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-[#E5E7EB] dark:border-[#334155] flex justify-end">
+              <button
+                onClick={() => setSelectedExporter(null)}
+                className="px-4 py-2 rounded-lg bg-[#1B7F4B] hover:bg-[#145C36] text-white text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

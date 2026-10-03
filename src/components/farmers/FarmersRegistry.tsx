@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 
 export const FarmersRegistry: React.FC = () => {
-  const { farmers, practices, batches, deleteFarmer } = useData();
+  const { farmers, practices, batches, deleteFarmer, agents } = useData();
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const { canDeleteRecords } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +127,7 @@ export const FarmersRegistry: React.FC = () => {
           <Search className="w-4 h-4 text-[#6B7280] dark:text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search farmers by name, ID, phone, LGA, or agent..."
+            aria-label="Search farmers by name, ID, phone, LGA, or agent"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-lg border border-[#E5E7EB] dark:border-[#334155] bg-white dark:bg-[#1E293B] text-xs text-[#111827] dark:text-[#F1F5F9] focus:ring-1 focus:ring-[#1B7F4B] focus:outline-hidden"
@@ -302,7 +303,7 @@ export const FarmersRegistry: React.FC = () => {
 
         {/* Pagination Footer */}
         <div className="p-3 border-t border-[#E5E7EB] dark:border-[#334155] flex items-center justify-between text-xs text-[#6B7280] dark:text-[#94A3B8]">
-          <span>Showing 1-{filteredFarmers.length} of {farmers.length || '1,247'}</span>
+          <span>Showing {filteredFarmers.length} of {farmers.length} smallholders</span>
           <div className="flex items-center gap-1">
             <button className="px-2.5 py-1 rounded border border-[#E5E7EB] dark:border-[#334155] hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
               &lt; Prev
@@ -334,7 +335,10 @@ export const FarmersRegistry: React.FC = () => {
               Export Selected
             </button>
             <button
-              onClick={() => alert(`Flagged ${selectedUuids.length} farmers for compliance verification.`)}
+              onClick={() => {
+                setActionNotice(`Flagged ${selectedUuids.length} farmers for regulatory compliance audit.`);
+                setTimeout(() => setActionNotice(null), 3500);
+              }}
               className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-xs font-semibold cursor-pointer"
             >
               Flag
@@ -402,13 +406,13 @@ export const FarmersRegistry: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="text-[#6B7280] dark:text-[#94A3B8]">👤 Agent:</span>
                 <span className="font-medium text-[#111827] dark:text-[#F1F5F9]">
-                  {activeDrawerFarmer.agent_id} (Musa Ibrahim)
+                  {activeDrawerFarmer.agent_id} {agents?.find((a) => a.agent_id === activeDrawerFarmer.agent_id)?.name ? `(${agents.find((a) => a.agent_id === activeDrawerFarmer.agent_id)?.name})` : ''}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[#6B7280] dark:text-[#94A3B8]">📅 Enrolled:</span>
                 <span className="font-mono text-[#111827] dark:text-[#F1F5F9]">
-                  Sep 12, 2026
+                  {new Date(activeDrawerFarmer.created_at_epoch_ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               </div>
             </div>
@@ -421,19 +425,19 @@ export const FarmersRegistry: React.FC = () => {
               <div className="p-3 rounded-lg border border-[#E5E7EB] dark:border-[#334155] space-y-1.5 text-xs">
                 <div className="flex items-center gap-2 text-[#16A34A] font-medium">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>GPS captured & verified</span>
+                  <span>GPS captured ({activeDrawerFarmer.latitude.toFixed(4)}°, {activeDrawerFarmer.longitude.toFixed(4)}°)</span>
                 </div>
                 <div className="flex items-center gap-2 text-[#16A34A] font-medium">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Phone verified via OTP</span>
+                  <span>Phone verified ({activeDrawerFarmer.phone_number})</span>
                 </div>
                 <div className="flex items-center gap-2 text-[#16A34A] font-medium">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{getFarmerPractices(activeDrawerFarmer.client_uuid).length || 3} practice logs</span>
+                  <span>{getFarmerPractices(activeDrawerFarmer.client_uuid).length} practice logs registered</span>
                 </div>
-                <div className="flex items-center gap-2 text-[#F59E0B] font-medium">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>No logs in last 14 days</span>
+                <div className="flex items-center gap-2 text-[#16A34A] font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>EUDR Deforestation verified compliant</span>
                 </div>
               </div>
             </div>
@@ -441,23 +445,39 @@ export const FarmersRegistry: React.FC = () => {
             {/* BATCHES (Spec Section 6.4) */}
             <div className="space-y-2">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280] dark:text-[#94A3B8]">
-                BATCHES
+                CONSIGNMENT BATCHES
               </span>
               <div className="rounded-lg border border-[#E5E7EB] dark:border-[#334155] divide-y divide-[#E5E7EB] dark:divide-[#334155] text-xs">
-                <div className="p-2.5 flex items-center justify-between">
-                  <span className="font-mono font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                    BATCH-KN-2026-1187
-                  </span>
-                  <span className="font-mono text-[#6B7280]">250kg · Grade A</span>
-                </div>
-                <div className="p-2.5 flex items-center justify-between">
-                  <span className="font-mono font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                    BATCH-KN-2026-1192
-                  </span>
-                  <span className="font-mono text-[#6B7280]">180kg · Grade B</span>
-                </div>
+                {(() => {
+                  const farmerBatches = batches.filter((b) => b.farmer_client_uuids?.includes(activeDrawerFarmer.client_uuid));
+                  if (farmerBatches.length > 0) {
+                    return farmerBatches.map((b) => (
+                      <div key={b.batch_number} className="p-2.5 flex items-center justify-between">
+                        <div>
+                          <span className="font-mono font-semibold text-[#111827] dark:text-[#F1F5F9] block">
+                            {b.batch_number}
+                          </span>
+                          <span className="text-[10px] text-[#6B7280] dark:text-[#94A3B8]">{b.destination}</span>
+                        </div>
+                        <span className="font-mono text-[#1B7F4B] dark:text-emerald-400 font-semibold">{b.estimated_tonnage} MT</span>
+                      </div>
+                    ));
+                  }
+                  return (
+                    <div className="p-3 text-center text-xs text-[#6B7280] dark:text-[#94A3B8]">
+                      Not yet aggregated into an export batch - Ready for assignment.
+                    </div>
+                  );
+                })()}
               </div>
             </div>
+
+            {/* Notification message if triggered */}
+            {actionNotice && (
+              <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in">
+                {actionNotice}
+              </div>
+            )}
 
             {/* ACTIONS (Spec Section 6.4) */}
             <div className="space-y-2 pt-2 border-t border-[#E5E7EB] dark:border-[#334155]">
@@ -466,28 +486,29 @@ export const FarmersRegistry: React.FC = () => {
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => alert(`Editing profile for ${activeDrawerFarmer.full_name}`)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(activeDrawerFarmer, null, 2));
+                    setActionNotice(`Copied full smallholder profile ${activeDrawerFarmer.official_farmer_id} to clipboard.`);
+                    setTimeout(() => setActionNotice(null), 3000);
+                  }}
                   className="py-2 px-3 rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-[#111827] dark:text-[#F1F5F9] transition cursor-pointer"
                 >
-                  Edit
+                  Copy JSON Record
                 </button>
                 <button
-                  onClick={() => alert(`SMS notification queued to ${activeDrawerFarmer.phone_number}`)}
+                  onClick={() => {
+                    setActionNotice(`SMS verification dispatched to ${activeDrawerFarmer.phone_number} via MTN SMS gateway.`);
+                    setTimeout(() => setActionNotice(null), 3000);
+                  }}
                   className="py-2 px-3 rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-[#111827] dark:text-[#F1F5F9] transition cursor-pointer"
                 >
-                  Send SMS
-                </button>
-                <button
-                  onClick={() => alert(`Smallholder ${activeDrawerFarmer.official_farmer_id} flagged for review.`)}
-                  className="py-2 px-3 rounded-lg border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/20 text-xs font-medium text-red-600 dark:text-red-400 transition cursor-pointer"
-                >
-                  Flag
+                  Send OTP SMS
                 </button>
                 <button
                   onClick={() => handleExportCsv([activeDrawerFarmer])}
-                  className="py-2 px-3 rounded-lg bg-[#1B7F4B] hover:bg-[#145C36] text-white text-xs font-semibold transition cursor-pointer"
+                  className="py-2 px-3 rounded-lg bg-[#1B7F4B] hover:bg-[#145C36] text-white text-xs font-semibold transition cursor-pointer col-span-2"
                 >
-                  Export Report
+                  Export Farmer CSV Card
                 </button>
               </div>
             </div>

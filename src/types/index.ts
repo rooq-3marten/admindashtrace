@@ -87,15 +87,55 @@ export interface AgentBatchSyncRequest {
   device_timestamp_ms: number;
   farmers: Omit<Farmer, 'official_farmer_id' | 'synced_at'>[];
   practices: Omit<PracticeLog, 'phi_cleared' | 'safe_harvest_date_ms' | 'synced_at'>[];
+  documents?: RegulatoryDocument[];
 }
 
 export interface AgentBatchSyncResponse {
-  status: 'synced';
+  status: 'synced' | 'success';
   synced_farmers_count: number;
   synced_practices_count: number;
+  synced_batches_count?: number;
+  synced_documents_count?: number;
   assigned_farmer_ids: Record<string, string>;
   server_timestamp_ms: number;
   message: string;
+}
+
+export type DocumentCategory =
+  | 'PHYTOSANITARY'
+  | 'EUDR_DEFORESTATION'
+  | 'LAB_MRL_ANALYSIS'
+  | 'BILL_OF_LADING'
+  | 'FARMER_KYC_LAND'
+  | 'SPRAY_PURCHASE_RECEIPT'
+  | 'GAP_INSPECTION_AUDIT';
+
+export type DocumentStatus = 'VERIFIED_COMPLIANT' | 'PENDING_REVIEW' | 'FLAGGED';
+
+export interface RegulatoryDocument {
+  id: string;
+  title: string;
+  category: DocumentCategory;
+  entity_type: 'FARMER' | 'BATCH' | 'SHIPMENT' | 'AGENT' | 'GLOBAL';
+  entity_id: string;
+  entity_name?: string;
+  file_name: string;
+  file_size_bytes: number;
+  mime_type: string;
+  file_data_url?: string;
+  tamper_proof_sha256: string;
+  regulatory_authority: string;
+  certificate_number?: string;
+  issue_date: string;
+  expiry_date?: string;
+  verification_status: DocumentStatus;
+  uploaded_by: string;
+  uploader_source: 'mobile_agent' | 'web_admin';
+  uploaded_at: string;
+  verified_by?: string;
+  verified_at?: string;
+  verification_notes?: string;
+  raw_metadata?: Record<string, any>;
 }
 
 export interface FieldAgent {
@@ -146,5 +186,43 @@ export interface QualityAlert {
   count: number;
   regions: string;
   actionLabel: string;
+}
+
+export interface ConnectionStrengthReport {
+  timestamp_ms: number;
+  gateway: {
+    reachable: boolean;
+    http_status: number;
+    latency_ms: number;
+    gateway_url: string;
+    server_time: string;
+  };
+  downstream_cache: {
+    reachable: boolean;
+    http_status: number;
+    latency_ms: number;
+    record_count: number;
+  };
+  database?: {
+    status: string;
+    farmers_count: number;
+    practices_count: number;
+    batches_count: number;
+    documents_count: number;
+    sync_logs_count: number;
+  };
+  mobile_link: {
+    active_mobile_devices: number;
+    online_agents_count: number;
+    total_agents_count: number;
+    latest_sync_timestamp_ms: number | null;
+    time_since_latest_sync_sec: number | null;
+    latest_sync_agent_id: string | null;
+    is_mobile_transmitting: boolean;
+  };
+  strength_score: number; // 0 - 100
+  signal_level: 'EXCELLENT' | 'GOOD' | 'MODERATE' | 'WEAK' | 'DISCONNECTED';
+  bars: number; // 0 to 4
+  verdict: string;
 }
 

@@ -15,6 +15,7 @@ import { FarmersRegistry } from './components/farmers/FarmersRegistry';
 import { PhiSentinel } from './components/compliance/PhiSentinel';
 import { ExportBatches } from './components/batches/ExportBatches';
 import { ShipmentsView } from './components/batches/ShipmentsView';
+import { DocumentsVault } from './components/documents/DocumentsVault';
 import { FleetMonitor } from './components/fleet/FleetMonitor';
 import { DataQualityDashboard } from './components/quality/DataQualityDashboard';
 import { QualityFlagsView } from './components/quality/QualityFlagsView';
@@ -78,6 +79,10 @@ function MainApp() {
             <ExportBatches />
           )}
 
+          {activeTab === 'documents' && (
+            <DocumentsVault />
+          )}
+
           {activeTab === 'shipments' && (
             <ShipmentsView />
           )}
@@ -132,6 +137,7 @@ function MainApp() {
       <MobileSyncSimulator
         isOpen={isSimulatorOpen}
         onClose={() => setIsSimulatorOpen(false)}
+        onNavigateToDocuments={() => setActiveTab('documents')}
       />
     </div>
   );

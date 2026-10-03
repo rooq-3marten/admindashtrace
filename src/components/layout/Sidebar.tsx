@@ -18,6 +18,7 @@ import {
   BarChart3,
   Download,
   CheckCircle2,
+  FileCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -28,6 +29,7 @@ export type TabType =
   | 'farmers'
   | 'phi_sentinel'
   | 'batches'
+  | 'documents'
   | 'shipments'
   | 'gis_map'
   | 'data_quality'
@@ -48,6 +50,19 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
+interface SidebarItem {
+  id: TabType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  badgeColor?: string;
+}
+
+interface SidebarSection {
+  title: string;
+  items: SidebarItem[];
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
@@ -55,17 +70,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const { role, userProfile } = useAuth();
-  const { stats, disputes, batches } = useData();
+  const { stats, disputes, batches, qualityAlerts, farmers, practices, documents } = useData();
 
   const handleNavClick = (tab: TabType) => {
     setActiveTab(tab);
     if (onCloseMobile) onCloseMobile();
   };
 
-  const pendingBatchesCount = batches.filter((b) => b.export_clearance_status === 'PENDING_CLEARANCE').length || 3;
-  const activeDisputesCount = disputes.filter((d) => d.status === 'Open').length || 2;
+  const pendingBatchesCount = batches.filter((b) => b.export_clearance_status === 'PENDING_CLEARANCE').length;
+  const pendingDocsCount = (documents || []).filter((d) => d.verification_status === 'PENDING_REVIEW').length;
+  const activeDisputesCount = disputes.filter((d) => d.status === 'Open').length;
+  const totalGapsCount = qualityAlerts?.length || 0;
 
-  const sections = [
+  const sections: SidebarSection[] = [
     {
       title: 'OVERVIEW',
       items: [
@@ -75,20 +92,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'OPERATIONS',
       items: [
-        { id: 'fleet' as TabType, label: 'Agents', icon: UserCheck, badge: `${stats.activeAgentsCount || 5}` },
-        { id: 'farmers' as TabType, label: 'Farmers', icon: Users, badge: stats.totalFarmers ? `${stats.totalFarmers}` : undefined },
+        { id: 'fleet' as TabType, label: 'Agents', icon: UserCheck, badge: `${stats.activeAgentsCount}` },
+        { id: 'farmers' as TabType, label: 'Farmers', icon: Users, badge: stats.totalFarmers > 0 ? `${stats.totalFarmers}` : undefined },
         { id: 'phi_sentinel' as TabType, label: 'Practice Logs', icon: FileSpreadsheet, badge: stats.activePhiHolds > 0 ? `${stats.activePhiHolds} PHI` : undefined },
-        { id: 'batches' as TabType, label: 'Batches', icon: Boxes, badge: `${pendingBatchesCount}` },
-        { id: 'shipments' as TabType, label: 'Shipments', icon: Truck, badge: `${stats.totalShipmentsInTransit || 1}` },
+        { id: 'batches' as TabType, label: 'Batches', icon: Boxes, badge: pendingBatchesCount > 0 ? `${pendingBatchesCount}` : undefined },
+        { id: 'documents' as TabType, label: 'Documents', icon: FileCheck, badge: pendingDocsCount > 0 ? `${pendingDocsCount} Review` : `${documents?.length || 0}`, badgeColor: pendingDocsCount > 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' : undefined },
+        { id: 'shipments' as TabType, label: 'Shipments', icon: Truck, badge: stats.totalShipmentsInTransit > 0 ? `${stats.totalShipmentsInTransit}` : undefined },
         { id: 'gis_map' as TabType, label: 'GIS Farm Plots', icon: MapPin, badge: 'EUDR' },
       ],
     },
     {
       title: 'QUALITY',
       items: [
-        { id: 'data_quality' as TabType, label: 'Data Gaps', icon: AlertTriangle, badge: '8', badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' },
-        { id: 'flags' as TabType, label: 'Flags', icon: Flag, badge: `${stats.flaggedPractices || 5}`, badgeColor: 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300' },
-        { id: 'disputes' as TabType, label: 'Disputes', icon: Scale, badge: `${activeDisputesCount}`, badgeColor: 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300' },
+        { id: 'data_quality' as TabType, label: 'Data Gaps', icon: AlertTriangle, badge: totalGapsCount > 0 ? `${totalGapsCount}` : undefined, badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' },
+        { id: 'flags' as TabType, label: 'Flags', icon: Flag, badge: stats.flaggedPractices > 0 ? `${stats.flaggedPractices}` : undefined, badgeColor: 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300' },
+        { id: 'disputes' as TabType, label: 'Disputes', icon: Scale, badge: activeDisputesCount > 0 ? `${activeDisputesCount}` : undefined, badgeColor: 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300' },
       ],
     },
     {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { TabType } from '../layout/Sidebar';
 import {
@@ -26,7 +26,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   setActiveTab,
   onOpenSimulator,
 }) => {
-  const { farmers, batches, practices, syncLogs, stats } = useData();
+  const { farmers, batches, practices, syncLogs, stats, agents, disputes } = useData();
 
   const [hoveredTrendPoint, setHoveredTrendPoint] = useState<{
     date: string;
@@ -35,32 +35,47 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     y: number;
   } | null>(null);
 
-  // 30-day enrollment trend points (Spec Section 7.1)
-  const trendPoints = [
-    { date: 'Sep 1', value: 12 },
-    { date: 'Sep 4', value: 28 },
-    { date: 'Sep 8', value: 65 },
-    { date: 'Sep 11', value: 92 },
-    { date: 'Sep 15', value: 134 },
-    { date: 'Sep 18', value: 168 },
-    { date: 'Sep 22', value: 185 },
-    { date: 'Sep 25', value: 215 },
-    { date: 'Sep 28', value: 248 },
-    { date: 'Sep 30', value: 230 },
-  ];
+  // Dynamic 30-day enrollment trend points from actual farmers
+  const trendPoints = useMemo(() => {
+    if (farmers.length === 0) {
+      return [
+        { date: 'Day 1', value: 0 },
+        { date: 'Day 5', value: 0 },
+        { date: 'Day 10', value: 0 },
+        { date: 'Day 15', value: 0 },
+        { date: 'Day 20', value: 0 },
+        { date: 'Day 25', value: 0 },
+        { date: 'Today', value: 0 },
+      ];
+    }
+    // Sort farmers by creation time and build cumulative points
+    const sorted = [...farmers].sort((a, b) => a.created_at_epoch_ms - b.created_at_epoch_ms);
+    const intervals = 8;
+    const minTime = sorted[0].created_at_epoch_ms;
+    const maxTime = Math.max(Date.now(), sorted[sorted.length - 1].created_at_epoch_ms);
+    const step = (maxTime - minTime) / (intervals - 1) || 1;
 
-  const maxVal = 250;
+    return Array.from({ length: intervals }).map((_, idx) => {
+      const threshold = minTime + idx * step;
+      const count = sorted.filter((f) => f.created_at_epoch_ms <= threshold).length;
+      const d = new Date(threshold);
+      const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return { date: label, value: count };
+    });
+  }, [farmers]);
+
+  const maxVal = Math.max(...trendPoints.map((p: { value: number }) => p.value), 10);
   const chartHeight = 160;
   const chartWidth = 600;
 
   // Compute SVG path
-  const svgCoords = trendPoints.map((pt, idx) => {
+  const svgCoords = trendPoints.map((pt: { date: string; value: number }, idx: number) => {
     const x = (idx / (trendPoints.length - 1)) * (chartWidth - 60) + 40;
     const y = chartHeight - (pt.value / maxVal) * (chartHeight - 30) - 15;
     return { ...pt, x, y };
   });
 
-  const pathD = svgCoords.reduce((acc, curr, idx) => {
+  const pathD = svgCoords.reduce((acc: string, curr: typeof svgCoords[0], idx: number) => {
     if (idx === 0) return `M ${curr.x} ${curr.y}`;
     const prev = svgCoords[idx - 1];
     const cpX1 = prev.x + (curr.x - prev.x) / 2;
@@ -71,6 +86,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   }, '');
 
   const areaD = `${pathD} L ${svgCoords[svgCoords.length - 1].x} ${chartHeight - 10} L ${svgCoords[0].x} ${chartHeight - 10} Z`;
+
+  // Dynamic Action Required calculations
+  const incompleteBatches = batches.filter((b) => b.export_clearance_status === 'PENDING_CLEARANCE');
+  const staleAgents = (agents || []).filter((a: any) => a.active_status === 'offline' || Date.now() - a.last_sync_epoch_ms > 24 * 3600 * 1000);
+  const openDisputes = disputes ? disputes.filter((d) => d.status === 'Open') : [];
+  const missingGpsFarmers = farmers.filter((f) => !f.latitude || !f.longitude || !f.gps_polygon);
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-200">
@@ -86,12 +107,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </span>
           <div className="my-2">
             <span className="text-[32px] font-bold text-[#111827] dark:text-[#F1F5F9] leading-none">
-              {stats.totalFarmers ? stats.totalFarmers.toLocaleString() : '1,247'}
+              {stats.totalFarmers.toLocaleString()}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#16A34A]">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>↑ 23 today</span>
+            <span>↑ {farmers.filter((f) => Date.now() - f.created_at_epoch_ms < 86400000).length} today</span>
           </div>
         </div>
 
@@ -101,16 +122,16 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           className="p-4 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E5E7EB] dark:border-[#334155] shadow-sm hover:border-[#1B7F4B] transition cursor-pointer flex flex-col justify-between"
         >
           <span className="text-[12px] font-semibold uppercase tracking-wider text-[#6B7280] dark:text-[#94A3B8]">
-            Batches This Week
+            Batches Registered
           </span>
           <div className="my-2">
             <span className="text-[32px] font-bold text-[#111827] dark:text-[#F1F5F9] leading-none">
-              {stats.totalBatches ? stats.totalBatches : 89}
+              {stats.totalBatches}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#16A34A]">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>↑ 12 today</span>
+            <span>{stats.certifiedBatchesCount} Certified EUDR/NAFDAC</span>
           </div>
         </div>
 
@@ -124,30 +145,30 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </span>
           <div className="my-2">
             <span className="text-[32px] font-bold text-[#111827] dark:text-[#F1F5F9] leading-none">
-              {stats.totalShipmentsInTransit || 4}
+              {stats.totalShipmentsInTransit}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#2563EB]">
-            <span>2 pending customs</span>
+            <span>Maritime routes active</span>
           </div>
         </div>
 
         {/* KPI 4: Sync Health (Warning variant) */}
         <div
           onClick={() => setActiveTab('system_health')}
-          className="p-4 rounded-xl bg-white dark:bg-[#1E293B] border-l-4 border-l-[#F59E0B] border-t border-r border-b border-[#E5E7EB] dark:border-[#334155] shadow-sm hover:border-l-[#F59E0B] transition cursor-pointer flex flex-col justify-between"
+          className="p-4 rounded-xl bg-white dark:bg-[#1E293B] border-l-4 border-l-[#16A34A] border-t border-r border-b border-[#E5E7EB] dark:border-[#334155] shadow-sm hover:border-l-[#16A34A] transition cursor-pointer flex flex-col justify-between"
         >
           <span className="text-[12px] font-semibold uppercase tracking-wider text-[#6B7280] dark:text-[#94A3B8]">
             Sync Health
           </span>
           <div className="my-2">
             <span className="text-[32px] font-bold text-[#111827] dark:text-[#F1F5F9] leading-none">
-              97.2%
+              {stats.syncHealthPercentage}%
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#F59E0B]">
-            <TrendingDown className="w-3.5 h-3.5" />
-            <span>↓ 2.8% (SMS GW degraded)</span>
+          <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#16A34A]">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>{stats.activeAgentsCount} Agents syncing live</span>
           </div>
         </div>
       </div>
@@ -176,11 +197,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
                 <span className="font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                  3 batches have missing practice logs
+                  {incompleteBatches.length > 0 ? `${incompleteBatches.length} export batches pending clearance` : 'All export lots cleared'}
                 </span>
               </div>
               <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8] ml-4 mt-0.5">
-                Kano region · 2 hours ago
+                {incompleteBatches.length > 0 ? `${incompleteBatches[0].batch_number} awaiting final certification` : 'EUDR/NAFDAC certificates intact'}
               </p>
             </div>
             <button
@@ -197,11 +218,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
                 <span className="font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                  2 agents haven't synced in 48 hours
+                  {staleAgents.length > 0 ? `${staleAgents.length} field enumerators offline or pending sync` : 'All field agents active'}
                 </span>
               </div>
               <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8] ml-4 mt-0.5">
-                Fatima S., Emeka N. · 1 day ago
+                {staleAgents.length > 0 ? `${staleAgents.map((a: any) => a.name).join(', ')}` : 'Low latency connectivity'}
               </p>
             </div>
             <button
@@ -218,11 +239,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
                 <span className="font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                  1 dispute pending resolution
+                  {openDisputes.length} smallholder {openDisputes.length === 1 ? 'dispute' : 'disputes'} pending resolution
                 </span>
               </div>
               <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8] ml-4 mt-0.5">
-                Farmer TH-KN-2026-00482 · 2 days ago
+                {openDisputes.length > 0 ? `${openDisputes[0].farmer_name} (${openDisputes[0].farmer_id})` : 'Dispute tribunal clear'}
               </p>
             </div>
             <button
@@ -239,11 +260,11 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
                 <span className="font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                  5 farmers enrolled without GPS
+                  {missingGpsFarmers.length} farmers enrolled without polygon boundaries
                 </span>
               </div>
               <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8] ml-4 mt-0.5">
-                Jigawa region · 3 days ago
+                {missingGpsFarmers.length > 0 ? `Centroid check required for ${missingGpsFarmers[0].state} cluster` : '100% EUDR plot coverage'}
               </p>
             </div>
             <button
@@ -270,45 +291,73 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
 
           <div className="space-y-3.5 text-xs text-[#111827] dark:text-[#F1F5F9]">
-            <div className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#1B7F4B] mt-1.5 shrink-0" />
-              <div>
-                <p className="font-medium">
-                  Agent Musa enrolled farmer <span className="font-mono text-[#1B7F4B] dark:text-emerald-400">TH-KN-2026-01247</span>
-                </p>
-                <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">2 minutes ago</p>
+            {/* Dynamic Activity Item 1: Latest Mobile Sync */}
+            {syncLogs.length > 0 && (
+              <div className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1B7F4B] mt-1.5 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    Agent <span className="font-mono text-[#1B7F4B] dark:text-emerald-400">{syncLogs[0].agent_id}</span> synced {syncLogs[0].farmers_count} farmers, {syncLogs[0].practices_count} practice logs
+                  </p>
+                  <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">
+                    {Math.max(1, Math.round((Date.now() - syncLogs[0].server_timestamp_ms) / 60000))} minutes ago
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
-              <div>
-                <p className="font-medium">
-                  Batch <span className="font-mono text-blue-600 dark:text-blue-400">BATCH-KN-2026-1187</span> created (250kg)
-                </p>
-                <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">15 minutes ago</p>
+            {/* Dynamic Activity Item 2: Latest Farmer Registered */}
+            {farmers.length > 0 && (
+              <div className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    Smallholder <span className="font-semibold">{farmers[0].full_name}</span> (<span className="font-mono text-blue-600 dark:text-blue-400">{farmers[0].official_farmer_id}</span>) enrolled in {farmers[0].lga}, {farmers[0].state}
+                  </p>
+                  <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">
+                    {Math.max(1, Math.round((Date.now() - farmers[0].created_at_epoch_ms) / 3600000))} hours ago
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" />
-              <div>
-                <p className="font-medium">
-                  Export consignment <span className="font-mono text-emerald-600 dark:text-emerald-400">EXP-2026-0042</span> validated successfully
-                </p>
-                <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">1 hour ago</p>
+            {/* Dynamic Activity Item 3: Latest Batch Certified or Created */}
+            {batches.length > 0 && (
+              <div className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    Export lot <span className="font-mono text-emerald-600 dark:text-emerald-400">{batches[0].batch_number}</span> ({batches[0].crop} · {batches[0].estimated_tonnage} MT) {batches[0].export_clearance_status === 'CERTIFIED_COMPLIANT' ? 'certified compliant' : 'logged'}
+                  </p>
+                  <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">
+                    {Math.max(1, Math.round((Date.now() - batches[0].created_at_ms) / 3600000))} hours ago
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex items-start gap-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626] mt-1.5 shrink-0" />
-              <div>
-                <p className="font-medium">
-                  Farmer <span className="font-mono text-red-600 dark:text-red-400">TH-KN-2026-00482</span> submitted dispute
-                </p>
-                <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">2 hours ago</p>
+            {/* Dynamic Activity Item 4: Latest Dispute or Flag */}
+            {openDisputes.length > 0 ? (
+              <div className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626] mt-1.5 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    Dispute logged: <span className="font-mono text-red-600 dark:text-red-400">{openDisputes[0].farmer_id}</span> ({openDisputes[0].issue})
+                  </p>
+                  <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">{openDisputes[0].date}</p>
+                </div>
               </div>
-            </div>
+            ) : practices.length > 0 ? (
+              <div className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" />
+                <div>
+                  <p className="font-medium">
+                    Practice log verified: <span className="font-mono text-emerald-600 dark:text-emerald-400">{practices[0].farmer_code}</span> ({practices[0].product_name})
+                  </p>
+                  <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">PHI Verified</p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -379,7 +428,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </p>
           </div>
           <span className="text-xs font-semibold text-[#1B7F4B] dark:text-emerald-400">
-            Total: 1,247 Smallholders
+            Total: {farmers.length.toLocaleString()} Smallholders
           </span>
         </div>
 
@@ -436,7 +485,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             />
 
             {/* Data Points */}
-            {svgCoords.map((pt) => (
+            {svgCoords.map((pt: any) => (
               <circle
                 key={pt.date}
                 cx={pt.x}

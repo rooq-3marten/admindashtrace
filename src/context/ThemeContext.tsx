@@ -20,12 +20,24 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('th_theme', theme);
     const root = document.documentElement;
+    const body = document.body;
+    root.setAttribute('data-theme', theme);
     if (theme === 'dark') {
       root.classList.add('dark');
       root.classList.remove('light');
+      if (body) {
+        body.classList.add('dark');
+        body.classList.remove('light');
+      }
+      root.style.colorScheme = 'dark';
     } else {
       root.classList.add('light');
       root.classList.remove('dark');
+      if (body) {
+        body.classList.add('light');
+        body.classList.remove('dark');
+      }
+      root.style.colorScheme = 'light';
     }
   }, [theme]);
 

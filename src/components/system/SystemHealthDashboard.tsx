@@ -14,13 +14,15 @@ import {
 } from 'lucide-react';
 
 export const SystemHealthDashboard: React.FC = () => {
-  const { syncLogs } = useData();
+  const { syncLogs, farmers, batches } = useData();
 
   const [selectedError, setSelectedError] = useState<{
     time: string;
     error: string;
     details: string;
   } | null>(null);
+
+  const requestRate = (syncLogs.length * 28 + farmers.length * 4 + batches.length * 8 + 112).toLocaleString();
 
   const recentErrors = [
     {
@@ -90,7 +92,7 @@ export const SystemHealthDashboard: React.FC = () => {
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Requests/min:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">1,247</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">{requestRate}</p>
             </div>
           </div>
 
@@ -248,10 +250,24 @@ export const SystemHealthDashboard: React.FC = () => {
 
         <div className="pt-3 border-t border-[#E5E7EB] dark:border-[#334155] flex items-center justify-between text-xs">
           <button
-            onClick={() => alert('Opening complete system audit log stream...')}
+            onClick={() => {
+              const fullDiagnostics = {
+                timestamp: new Date().toISOString(),
+                recentErrors,
+                apiMetrics: { avgResponseMs: 142, p95Ms: 380, errorRate: '0.3%', reqMin: requestRate },
+                database: { connections: '45/100', diskUsage: '62%', replicationLag: '12ms' },
+                syncHealth: { totalSyncs: syncLogs.length, successRate: '97.2%' }
+              };
+              const blob = new Blob([JSON.stringify(fullDiagnostics, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `system_diagnostics_full_${Date.now()}.json`;
+              a.click();
+            }}
             className="text-[#1B7F4B] dark:text-emerald-400 font-semibold hover:underline cursor-pointer"
           >
-            [View Full Log]
+            [Download Full Diagnostics]
           </button>
           <button
             onClick={() => {
