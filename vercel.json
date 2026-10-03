@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/api/v1/sync/upstream",
+      "destination": "https://admindashtrace-backend.vercel.app/api/v1/sync/upstream" },
+    { "source": "/api/v1/:path*",
+      "destination": "https://admindashtrace-backend.vercel.app/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
