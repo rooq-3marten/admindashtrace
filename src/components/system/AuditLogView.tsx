@@ -2,48 +2,10 @@ import React from 'react';
 import { History, Shield, Download, Filter, Search } from 'lucide-react';
 
 export const AuditLogView: React.FC = () => {
-  const auditEntries = [
-    {
-      id: 'AUD-9014',
-      timestamp: '2026-09-30 14:15:22',
-      actor: 'shekonifarooq@gmail.com (Super Admin)',
-      action: 'BATCH_VALIDATION_OVERRIDE',
-      resource: 'BATCH-KN-2026-1188',
-      reason: 'Agent verified phone submission backlog',
-      status: 'APPROVED',
-      ip: '102.89.44.11',
-    },
-    {
-      id: 'AUD-9013',
-      timestamp: '2026-09-30 13:46:07',
-      actor: 'AGENT-NG-042 (Haruna Abdullahi)',
-      action: 'UPSTREAM_BATCH_INGESTION',
-      resource: '1 Farmer, 1 Practice Log',
-      reason: 'Offline SQLite batch sync',
-      status: 'SUCCESS',
-      ip: '105.112.98.5',
-    },
-    {
-      id: 'AUD-9012',
-      timestamp: '2026-09-30 12:20:00',
-      actor: 'Dr. Aliyu Shehu (Compliance Officer)',
-      action: 'CONSIGNMENT_CERTIFICATION',
-      resource: 'EXP-TH-2026-9042',
-      reason: 'EU Annex II MRL compliance pass',
-      status: 'SEALED',
-      ip: '197.210.8.44',
-    },
-    {
-      id: 'AUD-9011',
-      timestamp: '2026-09-30 10:14:18',
-      actor: 'System Ingestion Daemon',
-      action: 'BANNED_CHEMICAL_FLAG',
-      resource: 'TH-BEN-2026-5521 (Dimethoate)',
-      reason: 'EU Annex II restricted pesticide detected',
-      status: 'FLAGGED',
-      ip: '127.0.0.1',
-    },
-  ];
+  const auditEntries: {
+    id: string; timestamp: string; actor: string; action: string;
+    resource: string; reason: string; status: string; ip: string;
+  }[] = [];
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-200">
@@ -91,6 +53,13 @@ export const AuditLogView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#334155] text-[#111827] dark:text-[#F1F5F9]">
+              {auditEntries.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-10 px-4 text-center text-[#6B7280] dark:text-[#94A3B8]">
+                    No audit events recorded yet.
+                  </td>
+                </tr>
+              )}
               {auditEntries.map((a) => (
                 <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <td className="py-3.5 px-4 font-mono font-semibold">
