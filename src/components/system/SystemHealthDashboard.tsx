@@ -22,30 +22,9 @@ export const SystemHealthDashboard: React.FC = () => {
     details: string;
   } | null>(null);
 
-  const requestRate = (syncLogs.length * 28 + farmers.length * 4 + batches.length * 8 + 112).toLocaleString();
+  const requestRate = '—';
 
-  const recentErrors = [
-    {
-      time: '14:32',
-      error: 'Sync failed for agent Musa I. (timeout)',
-      details: 'HTTP POST /api/v1/sync/upstream timed out after 30000ms. Device AGENT-NG-042 experienced 2G packet loss in Dambatta sector. Auto-retry scheduled.',
-    },
-    {
-      time: '13:15',
-      error: 'USSD session dropped (gateway error)',
-      details: 'MTN Nigeria USSD gateway returned service unavailable 503 for session #390124. Session state preserved in Redis queue.',
-    },
-    {
-      time: '11:47',
-      error: 'SMS delivery failed to +2348034512991',
-      details: 'Airtel Africa SMPP route failed: Handset unreachable (subscriber out of coverage area in Benue cluster).',
-    },
-    {
-      time: '09:22',
-      error: 'API 500 error on POST /batches',
-      details: 'Constraint violation on duplicate consignment passport hash check. Handled by fallback idempotency lock.',
-    },
-  ];
+  const recentErrors: { time: string; error: string; details: string }[] = [];
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-200">
@@ -80,15 +59,15 @@ export const SystemHealthDashboard: React.FC = () => {
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Avg response:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">142ms</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">P95 response:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">380ms</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Error rate:</span>
-              <p className="text-base font-bold text-[#16A34A] font-mono">0.3%</p>
+              <p className="text-base font-bold text-[#16A34A] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Requests/min:</span>
@@ -99,7 +78,7 @@ export const SystemHealthDashboard: React.FC = () => {
           {/* Sparkline Graphic */}
           <div className="pt-2">
             <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-[#E5E7EB] dark:border-[#334155] flex items-end justify-between h-14 gap-1">
-              {[20, 35, 28, 55, 75, 90, 100, 85, 70, 50, 40, 25, 18, 30, 45, 60, 80, 65, 45, 30].map(
+              {([] as number[]).map(
                 (h, idx) => (
                   <div
                     key={idx}
@@ -124,31 +103,31 @@ export const SystemHealthDashboard: React.FC = () => {
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Success rate:</span>
-              <p className="text-base font-bold text-[#16A34A] font-mono">97.2%</p>
+              <p className="text-base font-bold text-[#16A34A] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Failed syncs:</span>
-              <p className="text-base font-bold text-[#F59E0B] font-mono">23</p>
+              <p className="text-base font-bold text-[#F59E0B] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Retry queue:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">5</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Avg retry:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">1.4</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
           </div>
 
           {/* Visual Progress Bar */}
           <div className="pt-2 space-y-1.5">
             <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-              <div className="bg-[#16A34A] h-full" style={{ width: '97.2%' }} />
-              <div className="bg-[#F59E0B] h-full" style={{ width: '2.8%' }} />
+              <div className="bg-[#16A34A] h-full" style={{ width: '0%' }} />
+              <div className="bg-[#F59E0B] h-full" style={{ width: '0%' }} />
             </div>
             <div className="flex items-center justify-between text-[11px] text-[#6B7280] dark:text-[#94A3B8]">
-              <span>97.2% Ingested</span>
-              <span>2.8% Retried</span>
+              <span>— Ingested</span>
+              <span>— Retried</span>
             </div>
           </div>
         </div>
@@ -159,27 +138,27 @@ export const SystemHealthDashboard: React.FC = () => {
             <h3 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#94A3B8]">
               USSD/SMS GATEWAY
             </h3>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#16A34A]">
-              <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Operational
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#6B7280]">
+              <span className="w-2 h-2 rounded-full bg-slate-400" /> Not monitored
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">USSD sessions:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">342</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">SMS sent (24h):</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">1,892</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Delivery rate:</span>
-              <p className="text-base font-bold text-[#16A34A] font-mono">99.1%</p>
+              <p className="text-base font-bold text-[#16A34A] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Gateway latency:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">890ms</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
           </div>
         </div>
@@ -190,27 +169,27 @@ export const SystemHealthDashboard: React.FC = () => {
             <h3 className="font-semibold text-xs uppercase tracking-wider text-[#6B7280] dark:text-[#94A3B8]">
               DATABASE
             </h3>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#16A34A]">
-              <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Healthy
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#6B7280]">
+              <span className="w-2 h-2 rounded-full bg-slate-400" /> Not monitored
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Connections:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">45/100</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Disk usage:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">62%</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Replication:</span>
-              <p className="text-base font-bold text-[#16A34A] font-mono">12ms</p>
+              <p className="text-base font-bold text-[#16A34A] font-mono">—</p>
             </div>
             <div>
               <span className="text-[#6B7280] dark:text-[#94A3B8]">Last backup:</span>
-              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">2 hours ago</p>
+              <p className="text-base font-bold text-[#111827] dark:text-[#F1F5F9] font-mono">—</p>
             </div>
           </div>
         </div>
@@ -254,7 +233,7 @@ export const SystemHealthDashboard: React.FC = () => {
               const fullDiagnostics = {
                 timestamp: new Date().toISOString(),
                 recentErrors,
-                apiMetrics: { avgResponseMs: 142, p95Ms: 380, errorRate: '0.3%', reqMin: requestRate },
+                apiMetrics: { avgResponseMs: null, p95Ms: null, errorRate: null, reqMin: requestRate },
                 database: { connections: '45/100', diskUsage: '62%', replicationLag: '12ms' },
                 syncHealth: { totalSyncs: syncLogs.length, successRate: '97.2%' }
               };
