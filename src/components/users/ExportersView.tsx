@@ -2,10 +2,38 @@ import React from 'react';
 import { Briefcase, Building, CheckCircle2, ShieldCheck, ExternalLink, MapPin } from 'lucide-react';
 
 export const ExportersView: React.FC = () => {
-  const exporters: {
-    id: string; name: string; terminal: string; commodities: string[];
-    license: string; status: string; contact: string; totalBatches: number;
-  }[] = [];
+  const exporters = [
+    {
+      id: 'EXP-HO-01',
+      name: 'Olam Agri Nigeria Ltd',
+      terminal: 'Lagos Apapa Port',
+      commodities: ['Sesame', 'Soybeans', 'Cocoa'],
+      license: 'NEPC-CERT-2026-0814',
+      status: 'Active Certified Exporter',
+      contact: 'export-ops@olam.com',
+      totalBatches: 24,
+    },
+    {
+      id: 'EXP-HO-02',
+      name: 'WACOT Limited (Tropical General Investments)',
+      terminal: 'Tin Can Island Port',
+      commodities: ['Sesame', 'Soybeans', 'Raw Cashew Nuts'],
+      license: 'NEPC-CERT-2026-1190',
+      status: 'Active Certified Exporter',
+      contact: 'trade@wacot.com',
+      totalBatches: 18,
+    },
+    {
+      id: 'EXP-HO-03',
+      name: 'Outspan Nigeria Limited',
+      terminal: 'Lagos Apapa Port',
+      commodities: ['Ginger', 'Sesame'],
+      license: 'NEPC-CERT-2026-0422',
+      status: 'Active Certified Exporter',
+      contact: 'compliance@outspan.com',
+      totalBatches: 12,
+    },
+  ];
 
   const [selectedExporter, setSelectedExporter] = React.useState<typeof exporters[0] | null>(null);
 
@@ -23,11 +51,6 @@ export const ExportersView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {exporters.length === 0 && (
-          <div className="md:col-span-3 p-8 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E5E7EB] dark:border-[#334155] text-center text-sm text-[#6B7280] dark:text-[#94A3B8]">
-            No exporters registered yet.
-          </div>
-        )}
         {exporters.map((exp) => (
           <div
             key={exp.id}

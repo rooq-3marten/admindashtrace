@@ -28,6 +28,125 @@ export interface Farmer {
   created_at_epoch_ms: number;
   synced_at?: number;
   eudr_compliant?: boolean;
+  eudr_status?: 'EUDR_CERTIFIED' | 'COMPLIANCE_REVIEW_HOLD';
+  tree_cover_loss_post_2020_ha?: number;
+  tree_cover_baseline_2020_pct?: number;
+  eudr_risk_score?: number;
+  topology_valid?: boolean;
+  topology_repaired?: boolean;
+  neighbor_overlap_detected?: boolean;
+  sentinel_pass_date?: string;
+  sentinel_tile_id?: string;
+  satellite_evidence_sha256?: string;
+}
+
+export interface EudrTopologyResult {
+  is_valid: boolean;
+  was_repaired: boolean;
+  reasons: string[];
+  original_vertex_count: number;
+  cleaned_vertex_count: number;
+  has_self_intersections: boolean;
+  postgis_command: string;
+  cleaned_polygon_coords: { lat: number; lng: number }[];
+  cleaned_polygon_string: string;
+  wkt_polygon: string;
+  perimeter_meters: number;
+  calculated_hectares: number;
+}
+
+export interface NeighborOverlapItem {
+  conflicting_farmer_id: string;
+  conflicting_farmer_name: string;
+  conflicting_cooperative?: string;
+  conflicting_crop: string;
+  overlap_hectares: number;
+  overlap_percentage: number;
+  dispute_severity: 'LOW' | 'MEDIUM' | 'CRITICAL_DOUBLE_CLAIM';
+  intersection_centroid?: { lat: number; lng: number };
+}
+
+export interface EudrOverlapReport {
+  farmer_id: string;
+  farmer_name: string;
+  overlap_detected: boolean;
+  total_overlapping_ha: number;
+  conflicts: NeighborOverlapItem[];
+  resolution_status: 'DISPUTE_RISK' | 'CLEARED' | 'MUTUALLY_AGREED';
+}
+
+export interface EudrRemoteSensingAnalysis {
+  farmer_id: string;
+  farmer_name: string;
+  commodity: string;
+  country: string;
+  administrative_region: string;
+  farm_size_hectares: number;
+  baseline_cutoff_date: '2020-12-31';
+  forest_baseline_2020_pct: number;
+  current_tree_cover_pct: number;
+  tree_cover_loss_post_2020_ha: number;
+  tree_cover_loss_pct: number;
+  canopy_status: '0%_LOSS_EUDR_CERTIFIED' | 'DISTURBANCE_REVIEW_HOLD';
+  eudr_compliance_verdict: 'EUDR_CERTIFIED' | 'COMPLIANCE_REVIEW_HOLD';
+  risk_score: number; // 0 = Certified, >0 = Hold
+  copernicus_sentinel: {
+    sensor: string;
+    tile_id: string;
+    acquisition_date: string;
+    cloud_cover_pct: number;
+    mean_ndvi_2020: number;
+    mean_ndvi_current: number;
+    ndvi_drop_delta: number;
+  };
+  satellite_evidence_sha256: string;
+  timestamped_evidence_summary: string;
+}
+
+export interface EudrAnnexIIProperties {
+  commodity: string;
+  country_of_production: string;
+  eudr_due_diligence_id: string;
+  operator_name?: string;
+  operator_eori?: string;
+  export_batch_id?: string;
+  regulation_standard?: string;
+  cutoff_date?: string;
+  generation_timestamp?: string;
+  total_plots_count?: number;
+  total_certified_hectares?: number;
+}
+
+export interface EudrAnnexIIFeature {
+  type: 'Feature';
+  id: string;
+  geometry: {
+    type: 'Polygon';
+    coordinates: number[][][]; // [ [ [lng, lat], [lng, lat], ... ] ]
+  };
+  properties: {
+    farmer_id: string;
+    farmer_name: string;
+    commodity: string;
+    country_of_production: string;
+    administrative_region: string;
+    farm_size_hectares: number;
+    eudr_compliance_status: 'EUDR_CERTIFIED' | 'COMPLIANCE_REVIEW_HOLD';
+    tree_cover_loss_post_2020_ha: number;
+    tree_cover_baseline_2020_pct: number;
+    current_tree_cover_pct: number;
+    sentinel2_acquisition_date: string;
+    sentinel2_tile_id: string;
+    postgis_topology_status: string;
+    neighbor_overlap_detected: boolean;
+    tamper_proof_evidence_sha256: string;
+  };
+}
+
+export interface EudrAnnexIIFeatureCollection {
+  type: 'FeatureCollection';
+  properties: EudrAnnexIIProperties;
+  features: EudrAnnexIIFeature[];
 }
 
 export interface PracticeLog {

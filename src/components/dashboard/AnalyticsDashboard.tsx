@@ -274,6 +274,27 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               View →
             </button>
           </div>
+
+          {/* Action Item: EUDR Remote Sensing & Topology */}
+          <div className="py-3 flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold text-[#111827] dark:text-[#F1F5F9]">
+                  Enterprise Geospatial & EUDR Engine
+                </span>
+              </div>
+              <p className="text-[11px] text-[#6B7280] dark:text-[#94A3B8] ml-4 mt-0.5">
+                Copernicus Sentinel-2 Dec 31, 2020 forest cutoff baseline • PostGIS ST_MakeValid geometry validation
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('eudr_engine')}
+              className="px-3 py-1.5 rounded-md bg-[#1B7F4B] text-white hover:bg-[#145C36] font-medium transition cursor-pointer shrink-0"
+            >
+              EUDR Engine →
+            </button>
+          </div>
         </div>
       </div>
 

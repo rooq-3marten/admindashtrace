@@ -19,6 +19,7 @@ import {
   Download,
   CheckCircle2,
   FileCheck,
+  Trees,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -32,6 +33,7 @@ export type TabType =
   | 'documents'
   | 'shipments'
   | 'gis_map'
+  | 'eudr_engine'
   | 'data_quality'
   | 'flags'
   | 'disputes'
@@ -99,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'documents' as TabType, label: 'Documents', icon: FileCheck, badge: pendingDocsCount > 0 ? `${pendingDocsCount} Review` : `${documents?.length || 0}`, badgeColor: pendingDocsCount > 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' : undefined },
         { id: 'shipments' as TabType, label: 'Shipments', icon: Truck, badge: stats.totalShipmentsInTransit > 0 ? `${stats.totalShipmentsInTransit}` : undefined },
         { id: 'gis_map' as TabType, label: 'GIS Farm Plots', icon: MapPin, badge: 'EUDR' },
+        { id: 'eudr_engine' as TabType, label: 'EUDR Engine', icon: Trees, badge: 'Annex II' },
       ],
     },
     {

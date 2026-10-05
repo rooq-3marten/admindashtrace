@@ -19,7 +19,9 @@ import {
   FileCheck,
   Calendar,
   Lock,
+  Trees,
 } from 'lucide-react';
+import { generateOfficialEudrAnnexIIGeoJson, downloadGeoJsonFile } from '../../utils/eudrEngine';
 
 export const ExportBatches: React.FC = () => {
   const { batches, farmers, createBatch, overrideBatchValidation } = useData();
@@ -528,6 +530,24 @@ export const ExportBatches: React.FC = () => {
                   className="py-2 px-3 rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-[#111827] dark:text-[#F1F5F9] transition cursor-pointer"
                 >
                   Export Report CSV
+                </button>
+                <button
+                  onClick={() => {
+                    const linked = farmers.filter((f) => activeDetailBatch.farmer_client_uuids?.includes(f.client_uuid));
+                    const targetFarmers = linked.length > 0 ? linked : farmers.filter((f) => f.crop === activeDetailBatch.crop);
+                    const cleanBatchNum = activeDetailBatch.batch_number.replace(/\D/g, '');
+                    const ddsId = `DDS-2026-${cleanBatchNum.slice(-5) || '90412'}`;
+                    const annexII = generateOfficialEudrAnnexIIGeoJson(targetFarmers, {
+                      commodity: activeDetailBatch.crop,
+                      exportBatchId: activeDetailBatch.batch_number,
+                      eudrDueDiligenceId: ddsId,
+                    });
+                    downloadGeoJsonFile(annexII);
+                  }}
+                  className="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer col-span-2 shadow-xs"
+                >
+                  <Trees className="w-4 h-4" />
+                  <span>Export Official EUDR Annex II GeoJSON</span>
                 </button>
                 <button
                   onClick={() => {
