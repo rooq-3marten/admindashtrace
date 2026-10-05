@@ -141,22 +141,25 @@ export const ShipmentsView: React.FC = () => {
                       return (
                         <div className="space-y-1">
                           {ship.status === 'In Transit' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                              🚢 In Transit
+                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              In Transit
                             </span>
                           ) : ship.status === 'Delivered' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                              ✓ Delivered
+                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                              Discharged
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              ● Pending
+                            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                              Berth Pending
                             </span>
                           )}
 
                           {flagged && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
-                              <AlertTriangle className="w-2.5 h-2.5" />
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                               Doc Expiry &le; 14d ETA
                             </span>
                           )}

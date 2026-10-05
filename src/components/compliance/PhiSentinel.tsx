@@ -88,35 +88,34 @@ export const PhiSentinel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="space-y-4 animate-in fade-in duration-150">
       {/* Sentinel Mode Switcher */}
-      <div className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-[#E5E7EB] dark:border-slate-700 w-fit text-xs font-semibold">
+      <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-fit text-xs font-medium">
         <button
           onClick={() => setSentinelViewMode('PHI_COUNTDOWN')}
-          className={`px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-2 ${
+          className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-2 ${
             sentinelViewMode === 'PHI_COUNTDOWN'
-              ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 font-bold shadow-xs'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <span>🧪 Pre-Harvest Interval (PHI) Countdown</span>
+          <span>Pre-Harvest Interval (PHI) Countdown</span>
           {stats.activePhiHolds > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-mono">
-              {stats.activePhiHolds}
+            <span className="font-mono text-[11px] text-amber-700 dark:text-amber-400 font-bold">
+              ({stats.activePhiHolds})
             </span>
           )}
         </button>
 
         <button
           onClick={() => setSentinelViewMode('MARITIME_EXPIRY')}
-          className={`px-4 py-2 rounded-lg transition cursor-pointer flex items-center gap-2 ${
+          className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
             sentinelViewMode === 'MARITIME_EXPIRY'
-              ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 font-bold shadow-xs'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Ship className="w-3.5 h-3.5" />
-          <span>Automated Document Expiry Sentinel (ETA ≤ 14d)</span>
+          <span>Maritime Document Expiry Sentinel (ETA ≤ 14d)</span>
         </button>
       </div>
 
@@ -125,27 +124,26 @@ export const PhiSentinel: React.FC = () => {
       ) : (
         <>
           {/* Top Banner */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#E5E7EB] dark:border-slate-800 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 font-semibold">
-              NAFDAC Regulatory Sentinel
-            </span>
-            <span className="text-xs text-[#6B7280] dark:text-slate-400 font-mono">Maximum Residue Limit (MRL) Enforcement</span>
-          </div>
-          <h2 className="text-2xl font-bold text-[#111827] dark:text-white tracking-tight">Pre-Harvest Interval (PHI) Compliance Sentinel</h2>
-          <p className="text-sm text-[#6B7280] dark:text-slate-400 max-w-2xl mt-0.5">
-            Automated countdown tracking preventing premature smallholder harvesting before agrochemical residues degrade to safe export thresholds.
-          </p>
-        </div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div>
+              <div className="text-xs text-slate-500 font-mono mb-1">
+                NAFDAC Agrochemical Enforcement · Pre-Harvest Interval (PHI) Safeguard
+              </div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white tracking-tight">
+                Pre-Harvest Interval (PHI) Compliance Sentinel
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl mt-0.5">
+                Automated countdown tracking preventing premature smallholder harvesting before agrochemical residues degrade to safe European export thresholds.
+              </p>
+            </div>
 
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-[#E5E7EB] dark:border-slate-800 text-right">
-            <span className="text-[10px] uppercase font-mono text-[#6B7280] dark:text-slate-400">Quarantine Holds</span>
-            <div className="text-xl font-bold text-amber-600 dark:text-amber-400 font-mono">{stats.activePhiHolds} Active</div>
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-2 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
+                <span className="text-[10px] uppercase font-mono text-slate-500 block">Quarantine Holds</span>
+                <div className="text-xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.activePhiHolds} Active</div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
       {/* Filter and Search */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-[#E5E7EB] dark:border-slate-800 shadow-xs">

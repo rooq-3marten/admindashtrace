@@ -30,13 +30,13 @@ import {
 } from 'lucide-react';
 
 const CATEGORY_META: Record<DocumentCategory, { label: string; icon: string; color: string }> = {
-  PHYTOSANITARY: { label: 'Phytosanitary & Quarantine', icon: '🌿', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-  EUDR_DEFORESTATION: { label: 'EUDR Due Diligence', icon: '🛰️', color: 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-  LAB_MRL_ANALYSIS: { label: 'Lab Residue MRL Assay', icon: '🧪', color: 'bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-  BILL_OF_LADING: { label: 'Maritime Bill of Lading', icon: '🚢', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800' },
-  FARMER_KYC_LAND: { label: 'Farmer KYC & Land Title', icon: '👤', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-  SPRAY_PURCHASE_RECEIPT: { label: 'Agrochemical Purchase Invoice', icon: '🧾', color: 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border-rose-200 dark:border-rose-800' },
-  GAP_INSPECTION_AUDIT: { label: 'GAP Field Inspection Audit', icon: '🛡️', color: 'bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300 border-teal-200 dark:border-teal-800' },
+  PHYTOSANITARY: { label: 'Phytosanitary & Quarantine', icon: '', color: 'text-emerald-700 dark:text-emerald-400' },
+  EUDR_DEFORESTATION: { label: 'EUDR Due Diligence', icon: '', color: 'text-blue-700 dark:text-blue-400' },
+  LAB_MRL_ANALYSIS: { label: 'Lab Residue MRL Assay', icon: '', color: 'text-purple-700 dark:text-purple-400' },
+  BILL_OF_LADING: { label: 'Maritime Bill of Lading', icon: '', color: 'text-indigo-700 dark:text-indigo-400' },
+  FARMER_KYC_LAND: { label: 'Farmer KYC & Land Title', icon: '', color: 'text-amber-700 dark:text-amber-400' },
+  SPRAY_PURCHASE_RECEIPT: { label: 'Agrochemical Purchase Invoice', icon: '', color: 'text-rose-700 dark:text-rose-400' },
+  GAP_INSPECTION_AUDIT: { label: 'GAP Field Inspection Audit', icon: '', color: 'text-teal-700 dark:text-teal-400' },
 };
 
 export const DocumentsVault: React.FC = () => {

@@ -207,21 +207,21 @@ export const ExportBatches: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       {isStatusValidated && (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                          Validated
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                          Cleared
                         </span>
                       )}
                       {isStatusPending && (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
-                          Incomplete
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Pending Review
                         </span>
                       )}
                       {isStatusFlagged && (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626]" />
-                          Flagged
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                          Quarantine Hold
                         </span>
                       )}
                     </td>
@@ -347,21 +347,21 @@ export const ExportBatches: React.FC = () => {
 
               return (
                 <>
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-[#E5E7EB] dark:border-[#334155] grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-[#E5E7EB] dark:border-[#334155] grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <span className="text-[#6B7280] dark:text-[#94A3B8]">Status:</span>
-                      <div className="font-semibold text-[#111827] dark:text-[#F1F5F9] mt-0.5">
+                      <div className="font-semibold mt-0.5">
                         {activeDetailBatch.export_clearance_status === 'CERTIFIED_COMPLIANT' ? (
-                          <span className="text-[#16A34A] flex items-center gap-1 font-medium">
-                            ● Validated
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                            Cleared for Export
                           </span>
                         ) : activeDetailBatch.export_clearance_status === 'FLAGGED_QUARANTINE' ? (
-                          <span className="text-[#DC2626] flex items-center gap-1 font-medium">
-                            ● Quarantine Hold
+                          <span className="text-rose-700 dark:text-rose-400 font-medium">
+                            Quarantine Hold
                           </span>
                         ) : (
-                          <span className="text-[#F59E0B] flex items-center gap-1 font-medium">
-                            ⚠️ Incomplete
+                          <span className="text-amber-700 dark:text-amber-400 font-medium">
+                            Pending Clearance
                           </span>
                         )}
                       </div>
@@ -414,9 +414,9 @@ export const ExportBatches: React.FC = () => {
                               <p className="font-semibold text-[#111827] dark:text-[#F1F5F9]">{f.full_name}</p>
                               <span className="text-[10px] text-[#6B7280] dark:text-[#94A3B8]">{f.lga}, {f.state}</span>
                             </div>
-                            <div className="text-right">
-                              <span className="font-mono font-medium text-[#111827] dark:text-[#F1F5F9]">{f.farm_size_hectares} ha</span>
-                              <span className="block text-[10px] text-[#16A34A] font-medium">● EUDR Clear</span>
+                            <div className="text-right font-mono">
+                              <span className="font-medium text-[#111827] dark:text-[#F1F5F9]">{f.farm_size_hectares} ha</span>
+                              <span className="block text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">EUDR Clear</span>
                             </div>
                           </div>
                         ))
@@ -434,24 +434,24 @@ export const ExportBatches: React.FC = () => {
             {/* PROVENANCE CHAIN */}
             <div className="space-y-2">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280] dark:text-[#94A3B8]">
-                PROVENANCE CHAIN
+                STATUTORY VERIFICATION CRITERIA
               </span>
-              <div className="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 text-xs space-y-1.5 text-emerald-900 dark:text-emerald-300">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>All farmers enrolled with GPS coordinates</span>
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-700 dark:text-slate-300">WGS84 Farm Boundary Coordinates</span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-medium">Verified</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>All practice logs present & MRL cleared</span>
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-700 dark:text-slate-300">Chemical Logbooks & MRL Degradation</span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-medium">Verified</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>No unapproved chemical products detected</span>
+                <div className="p-2.5 flex items-center justify-between">
+                  <span className="text-slate-700 dark:text-slate-300">NAQS & NAFDAC Regulatory Clearance</span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-medium">Verified</span>
                 </div>
-                <div className="flex items-center gap-2 font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>Data completeness: 100%</span>
+                <div className="p-2.5 flex items-center justify-between bg-slate-50 dark:bg-slate-900/40">
+                  <span className="font-medium text-slate-900 dark:text-slate-100">Single-Window Export Readiness</span>
+                  <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">100% Cleared</span>
                 </div>
               </div>
             </div>
@@ -564,7 +564,7 @@ export const ExportBatches: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDossierModalBatch(activeDetailBatch)}
-                  className="py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 hover:from-emerald-700 hover:to-teal-900 text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer col-span-2 shadow-sm"
+                  className="py-2.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer col-span-2 shadow-xs"
                 >
                   <Package className="w-4 h-4" />
                   <span>Download Complete Customs Audit Dossier (.ZIP)</span>
