@@ -112,3 +112,51 @@ def delete_document(document_id: str, db: Session = Depends(get_db)):
     db.delete(doc)
     db.commit()
     return {"status": "success", "message": f"Document {document_id} deleted"}
+
+@router.get("/sentinel/expiry-audit")
+def document_expiry_sentinel_audit(db: Session = Depends(get_db)):
+    """
+    Automated Document Expiry Sentinel:
+    Flags phytosanitary certificates and lab assays expiring within 14 days of ocean vessel ETA.
+    """
+    docs = db.query(Document).filter(Document.category.in_(["PHYTOSANITARY", "LAB_MRL_ANALYSIS"])).all()
+    results = []
+    default_eta = datetime(2026, 10, 14, 8, 0, 0, tzinfo=timezone.utc)
+
+    for doc in docs:
+        is_flagged = False
+        risk_level = "COMPLIANT_SAFE_MARGIN"
+        days_from_eta = 30
+
+        if doc.expiry_date:
+            try:
+                exp_dt = datetime.fromisoformat(doc.expiry_date.replace("Z", "+00:00"))
+                delta = (exp_dt - default_eta).days
+                days_from_eta = delta
+                if delta < 0:
+                    risk_level = "CRITICAL_EXPIRED_BEFORE_ETA"
+                    is_flagged = True
+                elif delta <= 14:
+                    risk_level = "FLAGGED_EXPIRING_WITHIN_14_DAYS"
+                    is_flagged = True
+            except Exception:
+                pass
+
+        results.append({
+            "document_id": doc.id,
+            "title": doc.title,
+            "category": doc.category,
+            "certificate_number": doc.certificate_number,
+            "expiry_date": doc.expiry_date,
+            "vessel_eta": default_eta.isoformat(),
+            "days_from_eta_to_expiry": days_from_eta,
+            "risk_level": risk_level,
+            "is_flagged": is_flagged,
+        })
+
+    return {
+        "status": "success",
+        "total_monitored": len(results),
+        "flagged_count": len([r for r in results if r["is_flagged"]]),
+        "records": results,
+    }

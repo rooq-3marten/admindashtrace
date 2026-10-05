@@ -29,6 +29,7 @@ import { ExportersView } from './components/users/ExportersView';
 import { ReportsView } from './components/analytics/ReportsView';
 import { ExportsView } from './components/analytics/ExportsView';
 import { MobileSyncSimulator } from './components/simulator/MobileSyncSimulator';
+import { DocumentExpirySentinelView } from './components/compliance/DocumentExpirySentinelView';
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -109,6 +110,10 @@ function MainApp() {
 
           {activeTab === 'phi_sentinel' && (
             <PhiSentinel />
+          )}
+
+          {activeTab === 'expiry_sentinel' && (
+            <DocumentExpirySentinelView />
           )}
 
           {activeTab === 'batches' && (

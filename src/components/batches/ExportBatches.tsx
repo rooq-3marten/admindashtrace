@@ -20,8 +20,10 @@ import {
   Calendar,
   Lock,
   Trees,
+  Package,
 } from 'lucide-react';
 import { generateOfficialEudrAnnexIIGeoJson, downloadGeoJsonFile } from '../../utils/eudrEngine';
+import { AuditDossierModal } from './AuditDossierModal';
 
 export const ExportBatches: React.FC = () => {
   const { batches, farmers, createBatch, overrideBatchValidation } = useData();
@@ -30,6 +32,7 @@ export const ExportBatches: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Validated' | 'Incomplete' | 'Flagged'>('All');
   const [selectedBatchCodes, setSelectedBatchCodes] = useState<string[]>([]);
   const [activeDetailBatch, setActiveDetailBatch] = useState<ExportBatch | null>(null);
+  const [dossierModalBatch, setDossierModalBatch] = useState<ExportBatch | null>(null);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [overrideBatch, setOverrideBatch] = useState<ExportBatch | null>(null);
   const [overrideJustification, setOverrideJustification] = useState('');
@@ -226,21 +229,31 @@ export const ExportBatches: React.FC = () => {
                       {batch.container_id || '—'}
                     </td>
                     <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      {isStatusPending ? (
+                      <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={(e) => handleOpenOverride(batch, e)}
-                          className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 text-[11px] font-medium transition cursor-pointer"
+                          onClick={() => setDossierModalBatch(batch)}
+                          className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-semibold text-[11px] flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                          title="One-Click EUDR & Phytosanitary Audit Dossier"
                         >
-                          Override
+                          <Package className="w-3.5 h-3.5" />
+                          <span>Audit Dossier</span>
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => setActiveDetailBatch(batch)}
-                          className="text-[#1B7F4B] dark:text-emerald-400 hover:underline text-xs font-semibold cursor-pointer"
-                        >
-                          Details →
-                        </button>
-                      )}
+                        {isStatusPending ? (
+                          <button
+                            onClick={(e) => handleOpenOverride(batch, e)}
+                            className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 text-[11px] font-medium transition cursor-pointer"
+                          >
+                            Override
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setActiveDetailBatch(batch)}
+                            className="text-[#1B7F4B] dark:text-emerald-400 hover:underline text-xs font-semibold cursor-pointer"
+                          >
+                            Details →
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -550,6 +563,13 @@ export const ExportBatches: React.FC = () => {
                   <span>Export Official EUDR Annex II GeoJSON</span>
                 </button>
                 <button
+                  onClick={() => setDossierModalBatch(activeDetailBatch)}
+                  className="py-2.5 px-3 rounded-lg bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 hover:from-emerald-700 hover:to-teal-900 text-white text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer col-span-2 shadow-sm"
+                >
+                  <Package className="w-4 h-4" />
+                  <span>Download Complete Customs Audit Dossier (.ZIP)</span>
+                </button>
+                <button
                   onClick={() => {
                     setActiveDetailBatch({
                       ...activeDetailBatch,
@@ -564,6 +584,15 @@ export const ExportBatches: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Audit Dossier Modal */}
+      {dossierModalBatch && (
+        <AuditDossierModal
+          batch={dossierModalBatch}
+          isOpen={true}
+          onClose={() => setDossierModalBatch(null)}
+        />
       )}
 
       {/* Override Batch Validation Modal (Spec Section 6.5) */}

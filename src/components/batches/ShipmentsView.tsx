@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
-import { Shipment } from '../../types';
+import { Shipment, ExportBatch } from '../../types';
 import {
   Truck,
   Anchor,
@@ -12,18 +12,40 @@ import {
   ExternalLink,
   X,
   FileCheck,
+  Package,
+  AlertTriangle,
+  Ship,
 } from 'lucide-react';
+import { AuditDossierModal } from './AuditDossierModal';
+import { evaluateDocumentEtaRisks } from '../../utils/documentExpirySentinel';
 
 export const ShipmentsView: React.FC = () => {
-  const { shipments } = useData();
+  const { shipments, batches, documents } = useData();
 
   const [activeTab, setActiveTab] = useState<'All' | 'In Transit' | 'Pending' | 'Delivered'>('All');
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [dossierBatch, setDossierBatch] = useState<ExportBatch | null>(null);
+
+  // Sentinel records mapping
+  const sentinelRecords = useMemo(() => {
+    return evaluateDocumentEtaRisks(documents, batches, shipments);
+  }, [documents, batches, shipments]);
 
   const filtered = shipments.filter((s) => {
     if (activeTab === 'All') return true;
     return s.status === activeTab;
   });
+
+  const getBatchForShipment = (ship: Shipment): ExportBatch => {
+    return (
+      batches.find(
+        (b) =>
+          b.container_id === ship.container_id ||
+          b.vessel_name === ship.vessel_name ||
+          b.destination.toLowerCase().includes(ship.destination.toLowerCase().split(',')[0])
+      ) || batches[0]
+    );
+  };
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-200">
@@ -111,27 +133,57 @@ export const ShipmentsView: React.FC = () => {
                     {ship.estimated_arrival}
                   </td>
                   <td className="py-3.5 px-4">
-                    {ship.status === 'In Transit' ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                        🚢 In Transit
-                      </span>
-                    ) : ship.status === 'Delivered' ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                        ✓ Delivered
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                        ● Pending
-                      </span>
-                    )}
+                    {(() => {
+                      const flagged = sentinelRecords.find(
+                        (r) => r.containerId === ship.container_id && r.isFlagged
+                      );
+
+                      return (
+                        <div className="space-y-1">
+                          {ship.status === 'In Transit' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                              🚢 In Transit
+                            </span>
+                          ) : ship.status === 'Delivered' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                              ✓ Delivered
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                              ● Pending
+                            </span>
+                          )}
+
+                          {flagged && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              Doc Expiry &le; 14d ETA
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => setSelectedShipment(ship)}
-                      className="text-[#1B7F4B] dark:text-emerald-400 hover:underline font-semibold text-xs cursor-pointer"
-                    >
-                      Manifest →
-                    </button>
+                  <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          const batch = getBatchForShipment(ship);
+                          setDossierBatch(batch);
+                        }}
+                        className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer shadow-xs"
+                        title="Download NAQS, SGS, EUDR, BOL and SHA-256 package"
+                      >
+                        <Package className="w-3.5 h-3.5" />
+                        <span>Audit Dossier</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedShipment(ship)}
+                        className="text-[#1B7F4B] dark:text-emerald-400 hover:underline font-semibold text-xs cursor-pointer"
+                      >
+                        Manifest →
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -188,35 +240,47 @@ export const ShipmentsView: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#E5E7EB] dark:border-[#334155] flex items-center justify-between">
-              <button
-                onClick={() => {
-                  const bolData = {
-                    document_type: 'EXPORT_BILL_OF_LADING_PHYTOSANITARY',
-                    shipment_code: selectedShipment.shipment_code,
-                    vessel_name: selectedShipment.vessel_name,
-                    container_id: selectedShipment.container_id,
-                    carrier: selectedShipment.carrier,
-                    destination_port: selectedShipment.destination,
-                    total_tonnage_mt: selectedShipment.total_tonnage,
-                    batches_count: selectedShipment.batches_count,
-                    departure_date: selectedShipment.departure_date,
-                    estimated_arrival: selectedShipment.estimated_arrival,
-                    certification: 'NAFDAC & EUDR Annex II Phytosanitary Clearance Verified',
-                    cryptographic_seal_sha256: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-                    issued_at: new Date().toISOString(),
-                  };
-                  const blob = new Blob([JSON.stringify(bolData, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `bill_of_lading_${selectedShipment.shipment_code}.json`;
-                  a.click();
-                }}
-                className="px-4 py-2 rounded-lg bg-[#1B7F4B] hover:bg-[#145C36] text-white text-xs font-semibold cursor-pointer"
-              >
-                Download Bill of Lading
-              </button>
+            <div className="pt-3 border-t border-[#E5E7EB] dark:border-[#334155] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const batch = getBatchForShipment(selectedShipment);
+                    setDossierBatch(batch);
+                  }}
+                  className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Audit Dossier (.ZIP)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const bolData = {
+                      document_type: 'EXPORT_BILL_OF_LADING_PHYTOSANITARY',
+                      shipment_code: selectedShipment.shipment_code,
+                      vessel_name: selectedShipment.vessel_name,
+                      container_id: selectedShipment.container_id,
+                      carrier: selectedShipment.carrier,
+                      destination_port: selectedShipment.destination,
+                      total_tonnage_mt: selectedShipment.total_tonnage,
+                      batches_count: selectedShipment.batches_count,
+                      departure_date: selectedShipment.departure_date,
+                      estimated_arrival: selectedShipment.estimated_arrival,
+                      certification: 'NAFDAC & EUDR Annex II Phytosanitary Clearance Verified',
+                      cryptographic_seal_sha256: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+                      issued_at: new Date().toISOString(),
+                    };
+                    const blob = new Blob([JSON.stringify(bolData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `bill_of_lading_${selectedShipment.shipment_code}.json`;
+                    a.click();
+                  }}
+                  className="px-3 py-2 rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                >
+                  Bill of Lading JSON
+                </button>
+              </div>
               <button
                 onClick={() => setSelectedShipment(null)}
                 className="px-4 py-2 rounded-lg border border-[#E5E7EB] dark:border-[#334155] text-xs text-[#6B7280] dark:text-[#94A3B8] cursor-pointer"
@@ -226,6 +290,15 @@ export const ShipmentsView: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Audit Dossier Modal */}
+      {dossierBatch && (
+        <AuditDossierModal
+          batch={dossierBatch}
+          isOpen={true}
+          onClose={() => setDossierBatch(null)}
+        />
       )}
     </div>
   );
