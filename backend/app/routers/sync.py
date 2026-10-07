@@ -70,6 +70,11 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
                 gps_lng = f.longitude or f.gps_lng,
                 crop_type = f.crop or f.crop_type or "Sesame",
                 cooperative = f.cooperative_name or f.cooperative,
+                state = f.state,
+                lga = f.lga,
+                community = f.community,
+                farm_size_hectares = f.farm_size_hectares,
+                gps_polygon = f.gps_polygon,
                 enrolled_by_agent_id = agent_id,
                 source = f.source or "agent",
                 created_at = now_utc(),
@@ -102,7 +107,16 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
                     practice_type = p.practice_type,
                     product_name = p.product_name,
                     quantity = p.quantity_used or p.quantity or 1.0,
-                    log_date = p.log_date or now_utc(),
+                    active_ingredient = p.active_ingredient,
+                    dosage = p.dosage,
+                    quantity_unit = p.quantity_unit,
+                    pre_harvest_interval_days = p.pre_harvest_interval_days,
+                    nafdac_reg_no = p.nafdac_reg_no,
+                    nafdac_approved = p.nafdac_approved,
+                    gps_coordinates = p.gps_coordinates,
+                    risk_level = p.risk_level,
+                    verification_photo_uri = p.verification_photo_uri,
+                    log_date = (datetime.fromtimestamp(p.date_applied_epoch_ms / 1000, tz=timezone.utc) if p.date_applied_epoch_ms else None) or p.log_date or now_utc(),
                     source = p.source or "agent",
                     agent_id = agent_id,
                     created_at = now_utc(),
@@ -228,3 +242,52 @@ def get_sync_status(agent_id: str, db: Session = Depends(get_db)):
         status = agent.status,
         sync_health = health
     )
+
+
+def _ms(dt):
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp() * 1000)
+
+@router.get("/sync/status")
+def get_global_sync_status(db: Session = Depends(get_db)):
+    """Global sync status polled by the admin dashboard."""
+    from sqlalchemy import func
+    last = db.query(SyncEvent).order_by(SyncEvent.created_at.desc()).first()
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    last_ms = _ms(last.created_at) if last else now_ms
+    return {
+        "status": "ONLINE",
+        "mode": "BIDIRECTIONAL_REALTIME",
+        "server_timestamp_ms": now_ms,
+        "last_sync_timestamp_ms": last_ms,
+        "counts": {
+            "farmers": db.query(func.count(Farmer.id)).scalar() or 0,
+            "practices": db.query(func.count(PracticeLog.id)).scalar() or 0,
+            "batches": db.query(func.count(Batch.id)).scalar() or 0,
+            "agents": db.query(func.count(Agent.id)).scalar() or 0,
+            "sync_logs": db.query(func.count(SyncEvent.id)).scalar() or 0,
+        },
+        "latest_event": ({
+            "id": str(last.id),
+            "agent_id": last.agent_id or "",
+            "device_timestamp_ms": last_ms,
+            "server_timestamp_ms": last_ms,
+            "farmers_count": 0,
+            "practices_count": 0,
+            "status": last.status,
+            "message": f"{last.event_type} {last.entity_type}",
+        } if last else None),
+    }
+
+@router.get("/sync/ping")
+def sync_ping():
+    now = datetime.now(timezone.utc)
+    return {
+        "ok": True,
+        "service": "TraceHarvest Mobile Upstream Ingestion Gateway",
+        "server_time": now.isoformat(),
+        "timestamp_ms": int(now.timestamp() * 1000),
+    }
