@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Table, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Table, Text, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
@@ -61,6 +61,11 @@ class Farmer(Base):
     gps_lng = Column(Float, nullable=True)
     crop_type = Column(String(50), nullable=False, index=True)
     cooperative = Column(String(150), nullable=True)
+    state = Column(String(50), nullable=True)
+    lga = Column(String(100), nullable=True)
+    community = Column(String(150), nullable=True)
+    farm_size_hectares = Column(Float, nullable=True)
+    gps_polygon = Column(Text, nullable=True)
     enrolled_by_agent_id = Column(String(64), ForeignKey("agents.id"), nullable=True, index=True)
     source = Column(String(30), nullable=False, default="agent")
     created_at = Column(DateTime(timezone=True), default=now_utc)
@@ -78,6 +83,15 @@ class PracticeLog(Base):
     practice_type = Column(String(100), nullable=False)
     product_name = Column(String(150), nullable=True)
     quantity = Column(Float, default=1.0)
+    active_ingredient = Column(String(150), nullable=True)
+    dosage = Column(String(100), nullable=True)
+    quantity_unit = Column(String(30), nullable=True)
+    pre_harvest_interval_days = Column(Integer, nullable=True)
+    nafdac_reg_no = Column(String(100), nullable=True)
+    nafdac_approved = Column(Boolean, nullable=True)
+    gps_coordinates = Column(String(100), nullable=True)
+    risk_level = Column(String(30), nullable=True)
+    verification_photo_uri = Column(Text, nullable=True)
     log_date = Column(DateTime(timezone=True), nullable=False, default=now_utc)
     source = Column(String(30), nullable=False, default="agent")
     agent_id = Column(String(64), ForeignKey("agents.id"), nullable=True, index=True)
