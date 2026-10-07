@@ -4,7 +4,6 @@ import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
 import { UserRole } from '../../types';
 import { TabType } from './Sidebar';
-import { BrandLogo } from '../common/BrandLogo';
 import {
   Search,
   Bell,
@@ -193,8 +192,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <div className="md:hidden flex items-center">
-            <BrandLogo size="sm" showSubtitle={false} />
+          <div className="md:hidden flex items-center font-serif font-bold text-base text-[#1A2E23] dark:text-white">
+            TraceHarvest
           </div>
 
           <div className="hidden md:block">
@@ -410,29 +409,29 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => setIsUserMenuOpen((prev) => !prev)}
               className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
             >
-              <div className="w-7 h-7 rounded-full bg-[#1B7F4B] text-white flex items-center justify-center font-bold text-xs">
-                {userProfile.displayName ? userProfile.displayName.charAt(0) : 'A'}
+              <div className="w-7 h-7 rounded-full bg-[#1A4D2E] text-white flex items-center justify-center font-bold text-xs">
+                {userProfile?.displayName ? userProfile.displayName.charAt(0) : 'A'}
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#94A3B8] hidden sm:block" />
+              <ChevronDown className="w-3.5 h-3.5 text-[#5A6B60] dark:text-[#8A968E] hidden sm:block" />
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 rounded-xl bg-white dark:bg-[#1E293B] border border-[#E5E7EB] dark:border-[#334155] shadow-xl z-50 p-3 space-y-2 animate-in fade-in duration-150">
-                <div className="pb-2 border-b border-[#E5E7EB] dark:border-[#334155]">
-                  <p className="font-semibold text-sm text-[#111827] dark:text-[#F1F5F9] truncate">
-                    {userProfile.displayName}
+              <div className="absolute right-0 mt-2 w-64 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-xl z-50 p-3 space-y-2 animate-in fade-in duration-150">
+                <div className="pb-2 border-b border-[#E5EBE7] dark:border-[#2D4536]">
+                  <p className="font-semibold text-sm text-[#1A2E23] dark:text-white truncate">
+                    {userProfile?.displayName || 'Shekoni Farooq (Super Admin)'}
                   </p>
-                  <p className="text-xs text-[#6B7280] dark:text-[#94A3B8] truncate">
-                    {userProfile.email}
+                  <p className="text-xs text-[#5A6B60] dark:text-[#8A968E] truncate">
+                    {userProfile?.email || 'shekonifarooq@gmail.com'}
                   </p>
-                  <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-mono font-semibold rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    {role.toUpperCase()}
+                  <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-mono font-semibold rounded bg-[#EEF5F1] text-[#1A4D2E] dark:bg-[#20362A] dark:text-[#86EFAC]">
+                    {(role || 'super_admin').toUpperCase()}
                   </span>
                 </div>
 
                 {/* Role Switcher */}
                 <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-[#6B7280] dark:text-[#94A3B8] uppercase">
+                  <span className="text-[11px] font-semibold text-[#8A968E] uppercase">
                     Switch Active Role
                   </span>
                   {(['super_admin', 'compliance_officer', 'fleet_manager', 'inspector'] as UserRole[]).map((r) => (
@@ -444,8 +443,8 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       className={`w-full text-left px-2 py-1.5 rounded text-xs transition cursor-pointer ${
                         role === r
-                          ? 'bg-[#E8F5EE] text-[#1B7F4B] dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold'
-                          : 'text-[#111827] dark:text-[#F1F5F9] hover:bg-slate-100 dark:hover:bg-slate-800'
+                          ? 'bg-[#EEF5F1] text-[#1A4D2E] dark:bg-[#20362A] dark:text-[#86EFAC] font-semibold'
+                          : 'text-[#1A2E23] dark:text-[#E8F0EA] hover:bg-[#F7F9F7] dark:hover:bg-[#14261C]'
                       }`}
                     >
                       {r.replace('_', ' ').toUpperCase()}
@@ -453,41 +452,28 @@ export const Header: React.FC<HeaderProps> = ({
                   ))}
                 </div>
 
-                <div className="pt-2 border-t border-[#E5E7EB] dark:border-[#334155] space-y-1">
+                <div className="pt-2 border-t border-[#E5EBE7] dark:border-[#2D4536] space-y-1">
                   <button
                     onClick={() => {
                       onOpenSimulator();
                       setIsUserMenuOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#111827] dark:text-[#F1F5F9] hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#1A2E23] dark:text-[#E8F0EA] hover:bg-[#F7F9F7] dark:hover:bg-[#14261C] transition cursor-pointer"
                   >
-                    <Smartphone className="w-3.5 h-3.5 text-[#1B7F4B]" />
+                    <Smartphone className="w-3.5 h-3.5 text-[#1A4D2E]" />
                     Test Field Agent Sync
                   </button>
 
-                  {currentUser ? (
-                    <button
-                      onClick={() => {
-                        signOut();
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      Sign Out
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        signInWithGoogle();
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#1B7F4B] dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition cursor-pointer font-medium"
-                    >
-                      <LogIn className="w-3.5 h-3.5" />
-                      Sign In with Google
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#A63A2E] hover:bg-[#FDEEEC] dark:hover:bg-[#3D1E1B] transition cursor-pointer font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Sign Out
+                  </button>
                 </div>
               </div>
             )}

@@ -157,7 +157,7 @@ export const DocumentsVault: React.FC = () => {
         issue_date: uploadIssueDate,
         expiry_date: uploadExpiryDate || undefined,
         verification_status: 'PENDING_REVIEW',
-        uploaded_by: userProfile.email || 'compliance@traceharvest.ng',
+        uploaded_by: userProfile?.email || 'compliance@traceharvest.ng',
         uploader_source: 'web_admin',
         verification_notes: uploadNotes.trim() || undefined,
       });
@@ -182,14 +182,14 @@ export const DocumentsVault: React.FC = () => {
         activeDocument.id,
         status,
         verifyNotes.trim() || undefined,
-        userProfile.displayName || userProfile.email || 'Chief Compliance Director'
+        userProfile?.displayName || userProfile?.email || 'Chief Compliance Director'
       );
       setActiveDocument((prev) =>
         prev
           ? {
               ...prev,
               verification_status: status,
-              verified_by: userProfile.displayName || userProfile.email,
+              verified_by: userProfile?.displayName || userProfile?.email || 'Authorized Compliance Officer',
               verified_at: new Date().toISOString(),
               verification_notes: verifyNotes.trim() || prev.verification_notes,
             }

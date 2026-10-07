@@ -23,7 +23,6 @@ import {
 } from '@phosphor-icons/react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { BrandLogo } from '../common/BrandLogo';
 
 export type TabType =
   | 'dashboard'
@@ -154,9 +153,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isMobileOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Brand Header */}
-        <div className="h-16 px-4 border-b border-[#E5EBE7] dark:border-[#2D4536] flex items-center shrink-0 bg-white dark:bg-[#1A2E23]">
-          <BrandLogo size="md" />
+        {/* Solid Deep Green Brand Space — No Logo */}
+        <div className="h-[72px] px-5 bg-[#1A4D2E] flex flex-col justify-center shrink-0">
+          <div className="font-serif font-bold text-[20px] text-white tracking-[0.5px] leading-tight">
+            TraceHarvest
+          </div>
+          <div className="text-[12px] font-medium text-[#D8E8DE] tracking-normal leading-none mt-1">
+            Admin
+          </div>
         </div>
 
         {/* Scrollable Navigation Sections */}

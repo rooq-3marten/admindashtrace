@@ -132,15 +132,15 @@ export const RbacManagement: React.FC = () => {
             </div>
             <div>
               <span className="text-[10px] uppercase font-mono text-[#6B7280] dark:text-slate-400 font-semibold">Active Authentication Principal</span>
-              <h3 className="text-base font-bold text-[#111827] dark:text-white">{userProfile.displayName}</h3>
-              <p className="text-xs text-[#6B7280] dark:text-slate-400 font-mono">{userProfile.email}</p>
+              <h3 className="text-base font-bold text-[#111827] dark:text-white">{userProfile?.displayName || 'Authorized Administrator'}</h3>
+              <p className="text-xs text-[#6B7280] dark:text-slate-400 font-mono">{userProfile?.email || 'admin@traceharvest.com'}</p>
             </div>
           </div>
 
           <div className="text-right">
             <span className="text-[10px] uppercase font-mono text-[#6B7280] dark:text-slate-400 font-semibold">Active Role</span>
             <div className="text-sm font-bold text-[#1B7F4B] dark:text-emerald-400 font-mono uppercase">{role}</div>
-            <span className="text-[10px] text-[#6B7280] dark:text-slate-400">{userProfile.agency}</span>
+            <span className="text-[10px] text-[#6B7280] dark:text-slate-400">{userProfile?.agency || 'TraceHarvest HQ Oversight'}</span>
           </div>
         </div>
       </div>

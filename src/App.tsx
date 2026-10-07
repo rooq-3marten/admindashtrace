@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { Header } from './components/layout/Header';
 import { Sidebar, TabType } from './components/layout/Sidebar';
@@ -30,9 +30,65 @@ import { ReportsView } from './components/analytics/ReportsView';
 import { ExportsView } from './components/analytics/ExportsView';
 import { MobileSyncSimulator } from './components/simulator/MobileSyncSimulator';
 import { DocumentExpirySentinelView } from './components/compliance/DocumentExpirySentinelView';
+import { LandingPage } from './components/landing/LandingPage';
 
-function MainApp() {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+const TAB_PATH_MAP: Record<TabType, string> = {
+  dashboard: '/dashboard',
+  fleet: '/dashboard/agents',
+  farmers: '/dashboard/farmers',
+  phi_sentinel: '/dashboard/practice-logs',
+  batches: '/dashboard/batches',
+  documents: '/dashboard/customs-vault',
+  shipments: '/dashboard/shipments',
+  gis_map: '/dashboard/gis-map',
+  eudr_engine: '/dashboard/eudr-engine',
+  expiry_sentinel: '/dashboard/expiry-sentinel',
+  data_quality: '/dashboard/data-quality',
+  flags: '/dashboard/flags',
+  disputes: '/dashboard/disputes',
+  rbac: '/dashboard/rbac',
+  exporters: '/dashboard/exporters',
+  system_health: '/dashboard/system-health',
+  audit_log: '/dashboard/audit-log',
+  mobile_guide: '/dashboard/mobile-guide',
+  reports: '/dashboard/reports',
+  exports: '/dashboard/exports',
+};
+
+const PATH_TAB_MAP: Record<string, TabType> = {
+  '': 'dashboard',
+  'overview': 'dashboard',
+  'dashboard': 'dashboard',
+  'agents': 'fleet',
+  'fleet': 'fleet',
+  'farmers': 'farmers',
+  'practice-logs': 'phi_sentinel',
+  'phi-sentinel': 'phi_sentinel',
+  'batches': 'batches',
+  'customs-vault': 'documents',
+  'documents': 'documents',
+  'shipments': 'shipments',
+  'gis-map': 'gis_map',
+  'eudr-engine': 'eudr_engine',
+  'expiry-sentinel': 'expiry_sentinel',
+  'data-quality': 'data_quality',
+  'flags': 'flags',
+  'disputes': 'disputes',
+  'rbac': 'rbac',
+  'exporters': 'exporters',
+  'system-health': 'system_health',
+  'audit-log': 'audit_log',
+  'mobile-guide': 'mobile_guide',
+  'reports': 'reports',
+  'exports': 'exports',
+};
+
+interface MainAppProps {
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
+}
+
+function MainApp({ activeTab, setActiveTab }: MainAppProps) {
   const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [quotaExceeded, setQuotaExceeded] = useState<boolean>(false);
@@ -44,7 +100,7 @@ function MainApp() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] dark:bg-[#0F172A] text-[#111827] dark:text-[#F1F5F9] flex flex-col transition-colors duration-150">
+    <div className="min-h-screen bg-[#FBFCFB] dark:bg-[#0F1F17] text-[#1A2E23] dark:text-[#E8F0EA] flex flex-col transition-colors duration-150">
       {/* Google Maps Platform Quota Defense Banner */}
       {quotaExceeded && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm flex items-center justify-between">
@@ -69,7 +125,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* Top Application Bar (Spec Section 5) */}
+      {/* Top Application Bar */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -79,7 +135,7 @@ function MainApp() {
 
       {/* Main App Layout Shell: Fixed Sidebar (240px) + Scrollable Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Navigation Sidebar (Spec Section 5) */}
+        {/* Navigation Sidebar */}
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -87,7 +143,7 @@ function MainApp() {
           onCloseMobile={() => setIsMobileMenuOpen(false)}
         />
 
-        {/* Content View Area (max-width: 1440px, padding: 32px per spec) */}
+        {/* Content View Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           {activeTab === 'dashboard' && (
             <AnalyticsDashboard
@@ -184,12 +240,101 @@ function MainApp() {
   );
 }
 
+function RootRouter() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const segments = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/');
+    if (segments[0] === 'dashboard') {
+      const sub = segments[1] || '';
+      return PATH_TAB_MAP[sub] || 'dashboard';
+    }
+    return 'dashboard';
+  });
+
+  // Listen to popstate (back/forward history events)
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      setCurrentPath(path);
+      const segments = path.replace(/^\/+|\/+$/g, '').split('/');
+      if (segments[0] === 'dashboard') {
+        const sub = segments[1] || '';
+        setActiveTab(PATH_TAB_MAP[sub] || 'dashboard');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Handle tab switch inside the dashboard with URL update
+  const handleTabChange = (newTab: TabType) => {
+    setActiveTab(newTab);
+    const targetPath = TAB_PATH_MAP[newTab] || '/dashboard';
+    window.history.pushState(null, '', targetPath);
+    setCurrentPath(targetPath);
+  };
+
+  // Handle successful login from Landing Page
+  const handleLoginSuccess = () => {
+    const params = new URLSearchParams(window.location.search);
+    const redirectParam = params.get('redirect');
+    let target = '/dashboard';
+    if (redirectParam && redirectParam.startsWith('/dashboard')) {
+      target = redirectParam;
+    }
+    window.history.pushState(null, '', target);
+    setCurrentPath(target);
+    const segments = target.replace(/^\/+|\/+$/g, '').split('/');
+    const sub = segments[1] || '';
+    setActiveTab(PATH_TAB_MAP[sub] || 'dashboard');
+  };
+
+  // Loading state with warm earthy branding
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#FBFCFB] flex flex-col items-center justify-center p-6 text-[#1A2E23]">
+        <div className="w-12 h-12 rounded-xl bg-[#1A4D2E] flex items-center justify-center text-white font-serif font-bold text-2xl mb-4 shadow-sm animate-pulse">
+          T
+        </div>
+        <h2 className="font-serif font-bold text-xl text-[#1A2E23]">TraceHarvest</h2>
+        <p className="text-xs text-[#5A6B60] mt-1.5 font-mono">Verifying administrative security session…</p>
+      </div>
+    );
+  }
+
+  // Check if current route is a dashboard route
+  const isDashboardRoute = currentPath.startsWith('/dashboard');
+
+  // Route Protection: if visiting /dashboard/* while unauthenticated, redirect to "/" with ?redirect=...
+  if (isDashboardRoute && !isAuthenticated) {
+    const redirectUrl = `/?redirect=${encodeURIComponent(currentPath)}`;
+    if (window.location.pathname !== '/' || !window.location.search.includes('redirect=')) {
+      window.history.replaceState(null, '', redirectUrl);
+    }
+    return <LandingPage onSuccessLogin={handleLoginSuccess} />;
+  }
+
+  // Public Landing surface at "/"
+  if (!isDashboardRoute) {
+    return <LandingPage onSuccessLogin={handleLoginSuccess} />;
+  }
+
+  // Authenticated Dashboard surface at "/dashboard/*"
+  return (
+    <MainApp
+      activeTab={activeTab}
+      setActiveTab={handleTabChange}
+    />
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <DataProvider>
-          <MainApp />
+          <RootRouter />
         </DataProvider>
       </AuthProvider>
     </ThemeProvider>
