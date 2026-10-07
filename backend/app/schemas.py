@@ -78,6 +78,12 @@ class PracticeLogCreate(BaseModel):
     quantity_unit: Optional[str] = None
     log_date: Optional[datetime] = None
     date_applied_epoch_ms: Optional[int] = None
+    pre_harvest_interval_days: Optional[int] = None
+    nafdac_reg_no: Optional[str] = None
+    nafdac_approved: Optional[bool] = None
+    gps_coordinates: Optional[str] = None
+    risk_level: Optional[str] = None
+    verification_photo_uri: Optional[str] = None
     source: Optional[str] = "agent"
     agent_id: Optional[str] = None
 
