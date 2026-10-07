@@ -4,6 +4,7 @@ import { useData } from '../../context/DataContext';
 import { useTheme } from '../../context/ThemeContext';
 import { UserRole } from '../../types';
 import { TabType } from './Sidebar';
+import { BrandLogo } from '../common/BrandLogo';
 import {
   Search,
   Bell,
@@ -179,37 +180,41 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 h-16 bg-white dark:bg-[#0F172A] border-b border-[#E5E7EB] dark:border-[#334155] px-4 lg:px-8 flex items-center justify-between">
+      <header className="sticky top-0 z-30 h-16 bg-white dark:bg-[#1A2E23] border-b border-[#E5EBE7] dark:border-[#2D4536] px-4 lg:px-8 flex items-center justify-between">
         {/* Left: Page Title & Last Updated */}
         <div className="flex items-center gap-3">
           {onToggleMobileMenu && (
             <button
               onClick={onToggleMobileMenu}
-              className="p-1.5 rounded-lg text-[#6B7280] dark:text-[#94A3B8] hover:bg-slate-100 dark:hover:bg-slate-800 md:hidden cursor-pointer"
+              className="p-1.5 rounded-lg text-[#5A6B60] dark:text-[#8A968E] hover:bg-[#F7F9F7] dark:hover:bg-[#20362A] md:hidden cursor-pointer"
               title="Toggle Menu"
             >
               <Menu className="w-5 h-5" />
             </button>
           )}
 
-          <div>
-            <h1 className="font-semibold text-xl lg:text-2xl text-[#111827] dark:text-[#F1F5F9] tracking-tight">
+          <div className="md:hidden flex items-center">
+            <BrandLogo size="sm" showSubtitle={false} />
+          </div>
+
+          <div className="hidden md:block">
+            <h1 className="font-serif font-bold text-xl lg:text-2xl text-[#1A2E23] dark:text-white tracking-tight">
               {getPageTitle(activeTab)}
             </h1>
-            <p className="text-xs text-[#6B7280] dark:text-[#94A3B8]">
+            <p className="text-[13px] text-[#5A6B60] dark:text-[#8A968E]">
               Last updated: {Math.max(1, Math.round((Date.now() - lastServerSyncTime) / 60000))} minutes ago
             </p>
           </div>
         </div>
 
-        {/* Center: Verifiable Mobile Connection & Gateway Strength Check Pill */}
+        {/* Center: Verifiable Mobile Connection & Gateway Strength Check */}
         <div className="hidden lg:flex items-center gap-2">
           <button
             onClick={() => {
               checkConnectionStrength();
               setIsStrengthModalOpen(true);
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-[#E5E7EB] dark:border-[#334155] hover:border-emerald-500/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition cursor-pointer text-xs"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#FBFCFB] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536] hover:border-[#1A4D2E] transition cursor-pointer text-xs"
             title="Perform Mobile-to-Web Connection Strength Check"
           >
             {/* Visual Signal Bars */}
@@ -221,23 +226,23 @@ export const Header: React.FC<HeaderProps> = ({
                 const colorClass = !isLit
                   ? 'bg-slate-300 dark:bg-slate-700'
                   : currentBars >= 3
-                  ? 'bg-emerald-500 dark:bg-emerald-400'
+                  ? 'bg-[#2D6A4F] dark:bg-[#4A8A6A]'
                   : currentBars === 2
-                  ? 'bg-amber-500 dark:bg-amber-400'
-                  : 'bg-red-500 dark:bg-red-400';
+                  ? 'bg-[#B8860B] dark:bg-[#D97706]'
+                  : 'bg-[#A63A2E] dark:bg-[#DC2626]';
                 return <span key={bar} className={`w-1 rounded-xs transition-all ${heightClass} ${colorClass}`} />;
               })}
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[11px] font-semibold text-[#111827] dark:text-[#F1F5F9]">
+              <span className="font-mono text-[11px] font-semibold text-[#1A2E23] dark:text-white">
                 {connectionReport?.gateway.reachable
                   ? connectionReport.mobile_link.is_mobile_transmitting
                     ? `Mobile Uplink: Active (${connectionReport.gateway.latency_ms}ms)`
                     : `Gateway Ready (${connectionReport.gateway.latency_ms}ms)`
                   : 'Gateway Offline'}
               </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold bg-[#EEF5F1] dark:bg-[#20362A] text-[#1A4D2E] dark:text-[#D8E8DE]">
                 {connectionReport?.strength_score ?? 85}%
               </span>
             </div>
@@ -250,10 +255,10 @@ export const Header: React.FC<HeaderProps> = ({
               setTimeout(() => setIsRefreshing(false), 500);
             }}
             disabled={isRefreshing || isCheckingStrength}
-            className="p-2 rounded-full bg-slate-50 dark:bg-slate-900 border border-[#E5E7EB] dark:border-[#334155] hover:text-[#1B7F4B] transition cursor-pointer"
+            className="p-2 rounded-lg bg-[#FBFCFB] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536] hover:text-[#1A4D2E] transition cursor-pointer"
             title="Test connection strength & poll mobile fleet immediately"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-[#6B7280] dark:text-[#94A3B8] ${isRefreshing || isCheckingStrength ? 'animate-spin text-[#1B7F4B]' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-[#5A6B60] dark:text-[#8A968E] ${isRefreshing || isCheckingStrength ? 'animate-spin text-[#1A4D2E]' : ''}`} />
           </button>
         </div>
 

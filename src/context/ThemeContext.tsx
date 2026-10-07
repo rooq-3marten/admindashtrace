@@ -11,10 +11,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Spec: "Dark mode default for night shifts. High contrast for daylight."
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('th_theme') as Theme | null;
-    return saved === 'light' ? 'light' : 'dark';
+    return saved === 'dark' ? 'dark' : 'light';
   });
 
   useEffect(() => {

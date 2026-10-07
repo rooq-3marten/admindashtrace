@@ -60,6 +60,7 @@
       "enrolled_by_agent_id": "AGENT-NG-018",
       "source": "agent",
       "server_received_at": 1791048191972,
+      "created_at_epoch_ms": 1791048191972,
       "created_at": "2026-10-03T17:23:11.972Z",
       "synced_at": "2026-10-03T17:23:11.972Z"
     }
@@ -108,7 +109,66 @@
       "server_received_at": 1790775985782
     }
   ],
-  "batches": [],
+  "batches": [
+    {
+      "id": 1,
+      "client_uuid": "batch-2026-9042",
+      "batch_number": "EXP-TH-2026-9042",
+      "batch_code": "EXP-TH-2026-9042",
+      "crop": "Sesame",
+      "destination": "Rotterdam, Netherlands (European Union)",
+      "estimated_tonnage": 42.5,
+      "farmer_count": 24,
+      "farmer_client_uuids": [
+        "550e8400-e29b-41d4-a716-446655440000",
+        "test-farmer-sync-9901"
+      ],
+      "export_clearance_status": "CERTIFIED_COMPLIANT",
+      "tamper_proof_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "created_at_ms": 1790784000000,
+      "created_at": "2026-09-30T10:00:00.000Z",
+      "certified_by": "Dr. Aliyu Shehu (Chief Export Certifier, NAFDAC)",
+      "certification_date_ms": 1790870400000,
+      "container_id": "MSCU-904128-4",
+      "vessel_name": "CMA CGM Africa One"
+    },
+    {
+      "id": 2,
+      "client_uuid": "batch-2026-4419",
+      "batch_number": "EXP-TH-2026-4419",
+      "batch_code": "EXP-TH-2026-4419",
+      "crop": "Soybeans",
+      "destination": "Hamburg, Germany (European Union)",
+      "estimated_tonnage": 60,
+      "farmer_count": 31,
+      "farmer_client_uuids": [
+        "661f9511-f30c-42e5-b827-557766551111"
+      ],
+      "export_clearance_status": "PENDING_CLEARANCE",
+      "tamper_proof_sha256": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+      "created_at_ms": 1790956800000,
+      "created_at": "2026-10-02T10:00:00.000Z",
+      "container_id": "HLCU-312984-0",
+      "vessel_name": "Maersk Cadiz"
+    },
+    {
+      "id": 3,
+      "client_uuid": "batch-2026-1182",
+      "batch_number": "EXP-TH-2026-1182",
+      "batch_code": "EXP-TH-2026-1182",
+      "crop": "Ginger",
+      "destination": "London Gateway, United Kingdom",
+      "estimated_tonnage": 28,
+      "farmer_count": 15,
+      "farmer_client_uuids": [
+        "994c2844-c63f-45b8-eb50-880099884444"
+      ],
+      "export_clearance_status": "PENDING_CLEARANCE",
+      "tamper_proof_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "created_at_ms": 1791000000000,
+      "created_at": "2026-10-03T10:00:00.000Z"
+    }
+  ],
   "syncLogs": [
     {
       "id": "sync-1791048191972",

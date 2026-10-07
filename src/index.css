@@ -4,56 +4,95 @@
 
 @layer base {
   :root {
-    --color-brand-green: #1B7F4B;
-    --color-brand-green-dark: #145C36;
-    --color-brand-green-light: #E8F5EE;
+    /* Primary Deep Forest Green */
+    --color-green-primary: #1A4D2E;
+    --color-green-dark: #0F3320;
+    --color-green-mid: #2D6A4F;
+    --color-green-light: #D8E8DE;
+    --color-green-tint: #EEF5F1;
+
+    /* Surfaces */
+    --color-surface-white: #FFFFFF;
+    --color-surface-soft: #FBFCFB;
+    --color-surface-warm: #F7F9F7;
+
+    /* Borders */
+    --color-border-light: #E5EBE7;
+    --color-border-mid: #D1DBD5;
+
+    /* Text */
+    --color-text-primary: #1A2E23;
+    --color-text-secondary: #5A6B60;
+    --color-text-muted: #8A968E;
+
+    /* Status Colors */
+    --color-status-success: #2D6A4F;
+    --color-status-warning: #B8860B;
+    --color-status-error: #A63A2E;
+    --color-status-info: #3A5A7A;
+    --color-status-transit: #4A6FA5;
   }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Public Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
     overflow-x: hidden;
   }
 
-  .dark body, html.dark body {
-    background-color: #0F172A;
-    color: #F1F5F9;
+  .font-serif {
+    font-family: 'Fraunces', Georgia, serif;
   }
 
-  .light body, html.light body {
-    background-color: #F7F8FA;
-    color: #111827;
+  .font-sans {
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
   }
 
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Warm light theme - White dominates */
+  .light body, html.light body, body {
+    background-color: #FBFCFB;
+    color: #1A2E23;
+  }
+
+  /* Thoughtful deep green-black dark mode */
+  .dark body, html.dark body {
+    background-color: #0F1F17;
+    color: #E8F0EA;
   }
 }
 
-/* Custom modern scrollbar */
+/* Custom subtle warm shadows */
+.shadow-warm-card {
+  box-shadow: 0 1px 2px rgba(26, 77, 46, 0.04);
+}
+
+.shadow-warm-card-hover {
+  box-shadow: 0 2px 5px rgba(26, 77, 46, 0.07);
+}
+
+.shadow-warm-drawer {
+  box-shadow: 0 4px 16px rgba(26, 77, 46, 0.08);
+}
+
+/* Custom warm scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(229, 235, 231, 0.5);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.8);
+  background: rgba(184, 212, 194, 0.8);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 1);
+  background: rgba(45, 106, 79, 0.6);
 }
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.05); }
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 3s infinite ease-in-out;
-}
-

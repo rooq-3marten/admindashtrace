@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TraceHarvest Admin Portal</title>
-    <meta name="description" content="Enterprise agricultural traceability admin portal with real-time analytics, RBAC, GIS farm plot mapping, NAFDAC PHI compliance sentinel, and upstream field agent sync." />
-    <meta property="og:title" content="TraceHarvest Admin Portal" />
-    <meta property="og:description" content="Enterprise agricultural traceability admin portal with real-time analytics, RBAC, GIS farm plot mapping, NAFDAC PHI compliance sentinel, and upstream field agent sync." />
+    <title>TraceHarvest Control Center — Nigerian Agricultural Traceability</title>
+    <meta name="description" content="Agricultural traceability control center for Nigeria: smallholder enrollment, NAFDAC PHI compliance sentinel, EUDR due diligence, and maritime export batch certification." />
+    <meta property="og:title" content="TraceHarvest Control Center" />
+    <meta property="og:description" content="Agricultural traceability control center for Nigeria: smallholder enrollment, NAFDAC PHI compliance sentinel, EUDR due diligence, and maritime export batch certification." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <script>
       (function() {
         try {
           var t = localStorage.getItem('th_theme');
-          var isDark = t ? t === 'dark' : true;
+          var isDark = t === 'dark';
           if (isDark) {
             document.documentElement.classList.add('dark');
             document.documentElement.classList.remove('light');
@@ -24,13 +24,13 @@
             document.documentElement.style.colorScheme = 'light';
           }
         } catch (e) {
-          document.documentElement.classList.add('dark');
+          document.documentElement.classList.add('light');
         }
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=JetBrains+Mono:wght@400;500;600;700&family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>

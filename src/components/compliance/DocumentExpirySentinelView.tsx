@@ -105,34 +105,34 @@ export const DocumentExpirySentinelView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-150">
       {/* Top Banner - Clean, institutional prose */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-warm-card">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mb-1">
+          <div className="flex items-center gap-2 text-xs text-[#5A6B60] dark:text-[#A1B3A7] font-mono mb-1">
             <span>Maritime Risk Sentinel</span>
             <span aria-hidden="true">·</span>
             <span>Port of Arrival ETA Surveillance</span>
             <span aria-hidden="true">·</span>
             <span>Rotterdam / Hamburg Customs</span>
           </div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+          <h2 className="font-serif font-bold text-xl text-[#1A2E23] dark:text-white tracking-tight">
             Document Expiry Sentinel & Maritime Arrival Buffer
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl mt-0.5">
+          <p className="text-xs text-[#5A6B60] dark:text-[#A1B3A7] max-w-2xl mt-0.5">
             Automated cron monitoring comparing NAQS Phytosanitary Certificates and SGS Gas-Chromatography Lab Assays against ocean vessel Estimated Time of Arrival (ETA). Flags documents expiring within 14 days of discharge.
           </p>
         </div>
 
         {/* Cron Trigger Controls */}
         <div className="flex items-center gap-3">
-          <div className="px-3 py-2 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
-            <span className="text-[10px] uppercase font-mono text-slate-400 block">Cron Trigger Interval</span>
-            <span className="text-xs font-mono font-medium text-slate-800 dark:text-slate-200">{cronExpression} (Scheduled Every 6h)</span>
+          <div className="px-3 py-2 rounded-lg bg-[#FBFCFB] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536] text-right">
+            <span className="text-[10px] uppercase font-mono text-[#8A968E] block">Cron Interval</span>
+            <span className="text-xs font-mono font-medium text-[#1A2E23] dark:text-white">{cronExpression} (Every 6h)</span>
           </div>
 
           <button
             onClick={handleTriggerCronNow}
             disabled={isRunningCron}
-            className="px-3.5 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-medium text-xs flex items-center gap-2 transition cursor-pointer shadow-xs disabled:opacity-50"
+            className="px-3.5 py-2 rounded-lg bg-[#1A4D2E] hover:bg-[#0F3320] active:scale-98 text-white font-medium text-xs flex items-center gap-2 transition cursor-pointer shadow-warm-card disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRunningCron ? 'animate-spin' : ''}`} />
             <span>{isRunningCron ? 'Evaluating...' : 'Trigger Cron Scan'}</span>
@@ -142,12 +142,12 @@ export const DocumentExpirySentinelView: React.FC = () => {
 
       {/* Renewal Notification Alert */}
       {renewalNotice && (
-        <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between animate-in fade-in">
+        <div className="p-3 rounded-lg bg-[#EEF5F1] dark:bg-[#20362A] border border-[#B8D4C2] dark:border-[#2D4536] text-[#1A4D2E] dark:text-[#86EFAC] text-xs flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
             <span>{renewalNotice}</span>
           </div>
-          <button onClick={() => setRenewalNotice(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer font-medium">
+          <button onClick={() => setRenewalNotice(null)} className="text-[#1A4D2E] hover:underline cursor-pointer font-medium">
             Dismiss
           </button>
         </div>
@@ -155,34 +155,34 @@ export const DocumentExpirySentinelView: React.FC = () => {
 
       {/* KPI Cards - Flat, clean border layout */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <span className="text-[11px] font-mono text-slate-500 uppercase">Monitored Documents</span>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1 font-mono tabular-nums">{allRecords.length}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">Phytosanitary & Lab Chromatography</span>
+        <div className="p-4 rounded-xl border border-[#E5EBE7] dark:border-[#2D4536] bg-white dark:bg-[#1A2E23] shadow-warm-card">
+          <span className="text-[11px] font-mono text-[#5A6B60] dark:text-[#A1B3A7] uppercase">Monitored Documents</span>
+          <div className="text-2xl font-bold text-[#1A2E23] dark:text-white mt-1 font-mono tabular-nums">{allRecords.length}</div>
+          <span className="text-[11px] text-[#8A968E] mt-0.5 block">Phytosanitary & Lab Chromatography</span>
         </div>
 
-        <div className="p-4 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-white dark:bg-slate-900">
-          <span className="text-[11px] font-mono text-amber-700 dark:text-amber-400 uppercase">
+        <div className="p-4 rounded-xl border border-[#FEF7EC] dark:border-[#78350F] bg-white dark:bg-[#1A2E23] shadow-warm-card">
+          <span className="text-[11px] font-mono text-[#B8860B] dark:text-[#FCD34D] uppercase">
             Expiring ≤ 14 Days of Vessel ETA
           </span>
-          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1 font-mono tabular-nums">{flaggedCount}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">Customs quarantine risk threshold</span>
+          <div className="text-2xl font-bold text-[#B8860B] dark:text-[#FCD34D] mt-1 font-mono tabular-nums">{flaggedCount}</div>
+          <span className="text-[11px] text-[#8A968E] mt-0.5 block">Customs quarantine risk threshold</span>
         </div>
 
-        <div className="p-4 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-slate-900">
-          <span className="text-[11px] font-mono text-rose-700 dark:text-rose-400 uppercase">
+        <div className="p-4 rounded-xl border border-[#FDEEEC] dark:border-[#991B1B] bg-white dark:bg-[#1A2E23] shadow-warm-card">
+          <span className="text-[11px] font-mono text-[#A63A2E] dark:text-[#FCA5A5] uppercase">
             Expired Prior to Vessel ETA
           </span>
-          <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1 font-mono tabular-nums">{criticalCount}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">Immediate customs rejection</span>
+          <div className="text-2xl font-bold text-[#A63A2E] dark:text-[#FCA5A5] mt-1 font-mono tabular-nums">{criticalCount}</div>
+          <span className="text-[11px] text-[#8A968E] mt-0.5 block">Immediate customs rejection</span>
         </div>
 
-        <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 uppercase">
+        <div className="p-4 rounded-xl border border-[#E5EBE7] dark:border-[#2D4536] bg-white dark:bg-[#1A2E23] shadow-warm-card">
+          <span className="text-[11px] font-mono text-[#2D6A4F] dark:text-[#86EFAC] uppercase">
             Safe Single-Window Window (&gt; 14d)
           </span>
-          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono tabular-nums">{safeCount}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">Cleared for EU port discharge</span>
+          <div className="text-2xl font-bold text-[#2D6A4F] dark:text-[#86EFAC] mt-1 font-mono tabular-nums">{safeCount}</div>
+          <span className="text-[11px] text-[#8A968E] mt-0.5 block">Cleared for EU port discharge</span>
         </div>
       </div>
 

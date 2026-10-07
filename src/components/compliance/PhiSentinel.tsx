@@ -90,18 +90,18 @@ export const PhiSentinel: React.FC = () => {
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
       {/* Sentinel Mode Switcher */}
-      <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-fit text-xs font-medium">
+      <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536] w-fit text-xs font-medium">
         <button
           onClick={() => setSentinelViewMode('PHI_COUNTDOWN')}
           className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-2 ${
             sentinelViewMode === 'PHI_COUNTDOWN'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'bg-white dark:bg-[#1A2E23] text-[#1A4D2E] dark:text-[#86EFAC] font-semibold shadow-xs'
+              : 'text-[#5A6B60] dark:text-[#A1B3A7] hover:text-[#1A2E23] dark:hover:text-white'
           }`}
         >
           <span>Pre-Harvest Interval (PHI) Countdown</span>
           {stats.activePhiHolds > 0 && (
-            <span className="font-mono text-[11px] text-amber-700 dark:text-amber-400 font-bold">
+            <span className="font-mono text-[11px] text-[#B8860B] dark:text-[#FCD34D] font-bold">
               ({stats.activePhiHolds})
             </span>
           )}
@@ -111,8 +111,8 @@ export const PhiSentinel: React.FC = () => {
           onClick={() => setSentinelViewMode('MARITIME_EXPIRY')}
           className={`px-3 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
             sentinelViewMode === 'MARITIME_EXPIRY'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'bg-white dark:bg-[#1A2E23] text-[#1A4D2E] dark:text-[#86EFAC] font-semibold shadow-xs'
+              : 'text-[#5A6B60] dark:text-[#A1B3A7] hover:text-[#1A2E23] dark:hover:text-white'
           }`}
         >
           <span>Maritime Document Expiry Sentinel (ETA ≤ 14d)</span>
@@ -124,23 +124,23 @@ export const PhiSentinel: React.FC = () => {
       ) : (
         <>
           {/* Top Banner */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-warm-card">
             <div>
-              <div className="text-xs text-slate-500 font-mono mb-1">
+              <div className="text-xs text-[#5A6B60] dark:text-[#A1B3A7] font-mono mb-1">
                 NAFDAC Agrochemical Enforcement · Pre-Harvest Interval (PHI) Safeguard
               </div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white tracking-tight">
+              <h2 className="font-serif font-bold text-xl text-[#1A2E23] dark:text-white tracking-tight">
                 Pre-Harvest Interval (PHI) Compliance Sentinel
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl mt-0.5">
+              <p className="text-xs text-[#5A6B60] dark:text-[#A1B3A7] max-w-2xl mt-0.5">
                 Automated countdown tracking preventing premature smallholder harvesting before agrochemical residues degrade to safe European export thresholds.
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="px-3 py-2 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-right">
-                <span className="text-[10px] uppercase font-mono text-slate-500 block">Quarantine Holds</span>
-                <div className="text-xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.activePhiHolds} Active</div>
+              <div className="px-3 py-2 rounded-lg bg-[#FBFCFB] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536] text-right">
+                <span className="text-[10px] uppercase font-mono text-[#8A968E] block">Quarantine Holds</span>
+                <div className="text-xl font-bold text-[#B8860B] dark:text-[#FCD34D] font-mono tabular-nums">{stats.activePhiHolds} Active</div>
               </div>
             </div>
           </div>

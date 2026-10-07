@@ -137,22 +137,22 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-4xl max-h-[92vh] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-4xl max-h-[92vh] bg-white dark:bg-[#1A2E23] rounded-xl shadow-xl border border-[#E5EBE7] dark:border-[#2D4536] flex flex-col overflow-hidden">
         {/* Header - Quiet, institutional typography */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-start justify-between">
+        <div className="px-6 py-4 border-b border-[#E5EBE7] dark:border-[#2D4536] bg-white dark:bg-[#1A2E23] flex items-start justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mb-1">
+            <div className="flex items-center gap-2 text-xs text-[#5A6B60] dark:text-[#A1B3A7] font-mono mb-1">
               <span>European Single-Window Documentation</span>
               <span aria-hidden="true">·</span>
               <span>Port Inspection Clearance</span>
               <span aria-hidden="true">·</span>
               <span>Rotterdam / Hamburg</span>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+            <h3 className="font-serif font-bold text-lg text-[#1A2E23] dark:text-white tracking-tight">
               Single-Window Customs Audit Dossier
             </h3>
-            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 mt-1 font-mono">
-              <span className="font-bold text-slate-900 dark:text-white">{batch.batch_number}</span>
+            <div className="flex items-center gap-2 text-xs text-[#5A6B60] dark:text-[#A1B3A7] mt-1 font-mono">
+              <span className="font-bold text-[#1A2E23] dark:text-white">{batch.batch_number}</span>
               <span aria-hidden="true">/</span>
               <span>{batch.crop}</span>
               <span aria-hidden="true">/</span>
@@ -164,7 +164,7 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
+            className="p-1 rounded-md text-[#8A968E] hover:text-[#1A2E23] dark:hover:text-white transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -172,20 +172,20 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
 
         {/* Expiry Sentinel Alert (if flagged) */}
         {flaggedSentinel && (
-          <div className="mx-6 mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs">
+          <div className="mx-6 mt-4 p-3 rounded-lg bg-[#FEF7EC] dark:bg-[#3D2F1B] border border-[#FDE68A] dark:border-[#78350F] text-xs">
             <div className="flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-[#B8860B] dark:text-[#FCD34D] shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <div className="font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                <div className="font-semibold text-[#854D0E] dark:text-[#FCD34D] flex items-center gap-2">
                   <span>Document Expiry Warning: {flaggedSentinel.documentCategory}</span>
-                  <span className="font-mono text-[11px] font-normal text-amber-800 dark:text-amber-300">
+                  <span className="font-mono text-[11px] font-normal text-[#A16207]">
                     (Vessel ETA: {flaggedSentinel.etaDateStr})
                   </span>
                 </div>
-                <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
+                <p className="text-[#A16207] dark:text-[#FDE68A] leading-relaxed">
                   {flaggedSentinel.flagReason}
                 </p>
-                <p className="font-medium text-amber-900 dark:text-amber-200 pt-0.5">
+                <p className="font-medium text-[#854D0E] dark:text-[#FCD34D] pt-0.5">
                   Directive: {flaggedSentinel.remediationAction}
                 </p>
               </div>
@@ -194,7 +194,7 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
         )}
 
         {/* Tab Navigation - Clean Segmented Border */}
-        <div className="px-6 border-b border-slate-200 dark:border-slate-800 flex items-center gap-4 overflow-x-auto text-xs">
+        <div className="px-6 border-b border-[#E5EBE7] dark:border-[#2D4536] flex items-center gap-4 overflow-x-auto text-xs">
           {[
             { id: 'all', label: 'Dossier Checklist' },
             { id: 'phyto', label: '1. Phytosanitary (NAQS)' },
@@ -208,8 +208,8 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
               onClick={() => setActiveTab(tab.id as any)}
               className={`py-3 border-b-2 font-medium transition cursor-pointer whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'border-emerald-600 text-slate-900 dark:text-white font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                  ? 'border-[#1A4D2E] text-[#1A4D2E] dark:text-white font-semibold'
+                  : 'border-transparent text-[#5A6B60] hover:text-[#1A2E23] dark:hover:text-white'
               }`}
             >
               {tab.label}
@@ -221,14 +221,14 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {activeTab === 'all' && (
             <div className="space-y-5">
-              {/* Primary Download Bar - Functional, quiet dark header */}
-              <div className="p-4 rounded-lg bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Primary Download Bar - Functional, quiet dark forest green header */}
+              <div className="p-4 rounded-lg bg-[#1A2E23] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="text-xs text-slate-400 font-mono">Consignment Archive Package</div>
-                  <h4 className="text-sm font-semibold text-white mt-0.5">
+                  <div className="text-xs text-[#8A968E] font-mono">Consignment Archive Package</div>
+                  <h4 className="font-serif text-sm font-semibold text-white mt-0.5">
                     Download Official Customs Audit Dossier (.ZIP)
                   </h4>
-                  <p className="text-xs text-slate-400 mt-1 max-w-lg">
+                  <p className="text-xs text-[#C5D4CB] mt-1 max-w-lg">
                     Contains official NAQS Phytosanitary Certificate, SGS GC-MS/MS Laboratory Assay, EUDR Annex II GeoJSON, plot polygon cartography, and ocean bill of lading container seal verification.
                   </p>
                 </div>
@@ -236,7 +236,7 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
                 <button
                   onClick={handleDownloadFullZip}
                   disabled={isGenerating}
-                  className="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-2 transition cursor-pointer shrink-0 disabled:opacity-50"
+                  className="px-4 py-2.5 rounded-lg bg-[#2D6A4F] hover:bg-[#1A4D2E] active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-2 transition cursor-pointer shrink-0 disabled:opacity-50 shadow-warm-card"
                 >
                   <Download className="w-4 h-4" />
                   <span>{isGenerating ? 'Compiling Archive...' : 'Download Dossier (.ZIP)'}</span>
@@ -244,32 +244,32 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
               </div>
 
               {downloadSuccess && (
-                <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="p-3 rounded-lg bg-[#EEF5F1] dark:bg-[#20362A] border border-[#B8D4C2] dark:border-[#2D4536] text-[#1A4D2E] dark:text-[#86EFAC] text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
                   <span>Customs Audit Dossier downloaded successfully. All 5 regulatory verification files are packaged.</span>
                 </div>
               )}
 
               {/* Document Checklist Items - High-Density Clean List */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-lg divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <div className="border border-[#E5EBE7] dark:border-[#2D4536] rounded-lg divide-y divide-[#E5EBE7] dark:divide-[#2D4536] text-xs">
                 {/* 1. Phyto */}
-                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-slate-900">
+                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-[#1A2E23]">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      <span className="font-semibold text-[#1A2E23] dark:text-white">
                         1. Official Phytosanitary Certificate (NAQS Form 1)
                       </span>
-                      <span className="text-slate-500 font-mono text-[11px]">· IPPC Plant Health Standard</span>
+                      <span className="text-[#5A6B60] font-mono text-[11px]">· IPPC Plant Health Standard</span>
                     </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">
+                    <p className="text-[#5A6B60] dark:text-[#A1B3A7] text-[11px]">
                       Certified free from Trogoderma granarium (Khapra beetle). Phosphine degassing &lt;0.01 ppm verified. Valid 60 days.
                     </p>
                   </div>
                   <button
                     onClick={() => handleDownloadSingle('phyto')}
-                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                    className="px-3 py-1.5 rounded-md border border-[#E5EBE7] dark:border-[#2D4536] hover:bg-[#F7F9F7] text-[#1A2E23] dark:text-white text-xs font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
                   >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <Download className="w-3.5 h-3.5 text-[#5A6B60]" />
                     <span>Download PDF</span>
                   </button>
                 </div>

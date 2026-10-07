@@ -178,6 +178,14 @@ export const EudrEngineView: React.FC = () => {
   const [exportEori, setExportEori] = useState<string>('NL847291038');
   const [copiedJson, setCopiedJson] = useState<boolean>(false);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
 
   // Generated Official Annex II GeoJSON
   const generatedAnnexII = useMemo(() => {
@@ -193,17 +201,20 @@ export const EudrEngineView: React.FC = () => {
   const handleCopyGeoJson = () => {
     navigator.clipboard.writeText(JSON.stringify(generatedAnnexII, null, 2));
     setCopiedJson(true);
+    showToast('Annex II GeoJSON copied to clipboard', 'info');
     setTimeout(() => setCopiedJson(false), 2000);
   };
 
   const handleCopyEvidenceHash = (hash: string) => {
     navigator.clipboard.writeText(hash);
     setCopiedHash(true);
+    showToast('Cryptographic Evidence Hash SHA-256 copied', 'info');
     setTimeout(() => setCopiedHash(false), 2000);
   };
 
   const handleDownloadGeoJson = () => {
     downloadGeoJsonFile(generatedAnnexII);
+    showToast('EUDR Annex II GeoJSON export initiated', 'success');
   };
 
   const handleRegisterDispute = (collision: { farmerA: Farmer; farmerB: Farmer; overlapHa: number }) => {
@@ -216,7 +227,7 @@ export const EudrEngineView: React.FC = () => {
       details: `Automated PostGIS collision detection identified ${collision.overlapHa} ha overlap between plot ${collision.farmerA.official_farmer_id} and plot ${collision.farmerB.official_farmer_id}. Field cooperative dispute hold registered to prevent fraudulent dual EUDR clearance.`,
       status: 'Open',
     });
-    alert(`Dispute registered successfully for ${collision.farmerA.official_farmer_id} vs ${collision.farmerB.official_farmer_id}`);
+    showToast(`Dispute registered for ${collision.farmerA.official_farmer_id} vs ${collision.farmerB.official_farmer_id}`, 'success');
   };
 
   return (
@@ -256,7 +267,7 @@ export const EudrEngineView: React.FC = () => {
             <button
               onClick={() => {
                 setSimulatedLossHa(null);
-                alert('Copernicus Sentinel-2 & GFW baseline re-synchronized across all smallholder parcels.');
+                showToast('Copernicus Sentinel-2 & GFW baseline re-synchronized across all smallholder parcels.', 'info');
               }}
               className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 transition cursor-pointer"
             >
@@ -266,6 +277,31 @@ export const EudrEngineView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Floating In-App Notification Toast */}
+      {toastMessage && (
+        <div
+          role="status"
+          className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs font-medium shadow-md transition-all animate-in fade-in duration-200 ${
+            toastMessage.type === 'error'
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+              : toastMessage.type === 'info'
+              ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{toastMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
