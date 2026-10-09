@@ -241,12 +241,14 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
         </main>
       </div>
 
-      {/* Android Field Sync Simulator Modal */}
-      <MobileSyncSimulator
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-        onNavigateToDocuments={() => setActiveTab('documents')}
-      />
+      {/* Android Field Sync Simulator Modal - Rule 3: Disabled unless VITE_ENABLE_SIMULATOR is true */}
+      {import.meta.env.VITE_ENABLE_SIMULATOR === 'true' && (
+        <MobileSyncSimulator
+          isOpen={isSimulatorOpen}
+          onClose={() => setIsSimulatorOpen(false)}
+          onNavigateToDocuments={() => setActiveTab('documents')}
+        />
+      )}
     </div>
   );
 }

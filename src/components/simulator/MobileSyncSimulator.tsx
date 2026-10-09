@@ -419,6 +419,22 @@ export const MobileSyncSimulator: React.FC<MobileSyncSimulatorProps> = ({
   const handleSendSync = async () => {
     if (!currentPayload) return;
 
+    // Rule 3 Guard: Simulator must never post to production API and must be enabled via env
+    if (import.meta.env.VITE_ENABLE_SIMULATOR !== 'true') {
+      alert('Security Notice: Mobile Sync Simulator is disabled by system policy (VITE_ENABLE_SIMULATOR is not true).');
+      return;
+    }
+
+    const isProductionHost = typeof window !== 'undefined' &&
+      !window.location.hostname.includes('localhost') &&
+      !window.location.hostname.includes('127.0.0.1') &&
+      !window.location.hostname.includes('ais-dev');
+
+    if (isProductionHost) {
+      alert('Security Policy: Mobile Sync Simulator is strictly prohibited from broadcasting or posting records to the production API.');
+      return;
+    }
+
     const payloadCopy = JSON.parse(JSON.stringify(currentPayload)) as AgentBatchSyncRequest;
     if (payloadCopy.farmers[0] && payloadCopy.practices[0]) {
       payloadCopy.practices[0].farmer_client_uuid = payloadCopy.farmers[0].client_uuid;
@@ -440,7 +456,7 @@ export const MobileSyncSimulator: React.FC<MobileSyncSimulatorProps> = ({
     setTimeout(() => setCopiedResponse(false), 2000);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || import.meta.env.VITE_ENABLE_SIMULATOR !== 'true') return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
