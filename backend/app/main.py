@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import inspect, text
 from app.config import settings
 from app.database import engine, Base
-from app.routers import admin, auth, batches, farmers, practice_logs, sync, documents
+from app.routers import admin, auth, batches, farmers, practice_logs, sync, documents, agent_accounts
 
 # Columns added after the first release. create_all() never alters existing tables,
 # so any missing column is added here (safe to run on every start).
@@ -18,6 +18,12 @@ NEW_COLUMNS = {
         "pre_harvest_interval_days": "INTEGER", "nafdac_reg_no": "VARCHAR(100)",
         "nafdac_approved": "BOOLEAN", "gps_coordinates": "VARCHAR(100)",
         "risk_level": "VARCHAR(30)", "verification_photo_uri": "TEXT",
+    },
+    "agents": {
+        "auth_user_id": "VARCHAR(80)", "association": "VARCHAR(150)", "location": "VARCHAR(200)",
+        "assigned_lga": "VARCHAR(100)", "rejection_reason": "TEXT", "reviewed_by": "VARCHAR(150)",
+        "reviewed_at": "TIMESTAMP WITH TIME ZONE", "password_hash": "VARCHAR(255)",
+        "created_at": "TIMESTAMP WITH TIME ZONE", "updated_at": "TIMESTAMP WITH TIME ZONE",
     },
 }
 
@@ -63,6 +69,7 @@ app.include_router(practice_logs.router)
 app.include_router(batches.router)
 app.include_router(documents.router)
 app.include_router(admin.router)
+app.include_router(agent_accounts.router)
 app.include_router(auth.router)
 
 @app.get("/")
