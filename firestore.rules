@@ -166,5 +166,50 @@ service cloud.firestore {
       allow update: if false; // Sync logs are append-only audit trail
       allow delete: if isSuperAdmin();
     }
+
+    // 6. Registered Field Agents Collection
+    function isValidAgent(data) {
+      return data.keys().hasAll(['full_name', 'email', 'phone', 'association', 'location', 'status']) &&
+             data.full_name is string && data.full_name.size() <= 150 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.phone is string && data.phone.size() <= 30 &&
+             data.association is string && data.association.size() <= 150 &&
+             data.location is string && data.location.size() <= 150 &&
+             data.status in ['pending', 'approved', 'rejected', 'suspended'];
+    }
+
+    match /agents/{agentId} {
+      // Agents can read only their own row; staff can read all
+      allow get: if isStaff() || (
+        isSignedIn() && (
+          (resource.data.auth_user_id != null && resource.data.auth_user_id == request.auth.uid) ||
+          (resource.data.email != null && resource.data.email == request.auth.token.email)
+        )
+      );
+      allow list: if isStaff();
+      // On sign-up, status is strictly forced to 'pending' unless super admin
+      allow create: if isValidId(agentId) && isValidAgent(incoming()) && (
+        isSuperAdmin() || (
+          incoming().status == 'pending' &&
+          (!incoming().keys().hasAny(['rejection_reason', 'reviewed_by', 'reviewed_at']) || incoming().rejection_reason == null)
+        )
+      );
+      // Only admins can change status or review fields; agents can update non-status profile fields
+      allow update: if isValidId(agentId) && isValidAgent(incoming()) && (
+        isStaff() || (
+          isSignedIn() && (resource.data.auth_user_id == request.auth.uid || resource.data.email == request.auth.token.email) &&
+          incoming().status == existing().status &&
+          (!incoming().diff(existing()).affectedKeys().hasAny(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason']))
+        )
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // 7. Agent Audit Trail (Append-only by system & authenticated users)
+    match /audit_log/{logId} {
+      allow get, list: if isStaff();
+      allow create: if isSignedIn() && isValidId(logId);
+      allow update, delete: if false; // Audit trail is strictly immutable
+    }
   }
 }

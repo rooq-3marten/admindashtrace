@@ -272,6 +272,42 @@
         }
       },
       "required": ["agent_id", "server_timestamp_ms", "farmers_count", "practices_count"]
+    },
+    "Agent": {
+      "title": "Agent",
+      "description": "Registered field extension agent with lifecycle review status",
+      "type": "object",
+      "properties": {
+        "full_name": { "type": "string", "maxLength": 150 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "association": { "type": "string", "maxLength": 150 },
+        "location": { "type": "string", "maxLength": 150 },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected", "suspended"]
+        },
+        "rejection_reason": { "type": "string" },
+        "reviewed_by": { "type": "string" },
+        "reviewed_at": { "type": "string" },
+        "auth_user_id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["full_name", "email", "phone", "association", "location", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit trail of administrative review actions and self-registrations",
+      "type": "object",
+      "properties": {
+        "actor_id": { "type": "string" },
+        "action": { "type": "string" },
+        "target_agent_id": { "type": "string" },
+        "details": { "type": "object" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["actor_id", "action", "target_agent_id", "created_at"]
     }
   },
   "firestore": {
@@ -294,6 +330,14 @@
     "/sync_logs/{syncLogId}": {
       "schema": { "$ref": "SyncLog" },
       "description": "Mobile fleet sync telemetry"
+    },
+    "/agents/{agentId}": {
+      "schema": { "$ref": "Agent" },
+      "description": "Field extension agents"
+    },
+    "/audit_log/{logId}": {
+      "schema": { "$ref": "AuditLog" },
+      "description": "Agent review action audit trail"
     }
   }
 }

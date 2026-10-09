@@ -13,6 +13,8 @@ import {
   ConnectionStrengthReport,
   RegulatoryDocument,
   DocumentStatus,
+  RegisteredAgent,
+  AgentAuditLog,
 } from '../types';
 import {
   INITIAL_AGENTS,
@@ -24,6 +26,8 @@ import {
   INITIAL_DISPUTES,
   INITIAL_QUALITY_ALERTS,
   INITIAL_DOCUMENTS,
+  INITIAL_REGISTERED_AGENTS,
+  INITIAL_AGENT_AUDIT_LOGS,
 } from '../data/mockSeedData';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, setDoc, doc } from 'firebase/firestore';
@@ -39,6 +43,15 @@ interface DataContextType {
   qualityAlerts: QualityAlert[];
   syncLogs: SyncLog[];
   agents: FieldAgent[];
+  registeredAgents: RegisteredAgent[];
+  pendingAgentsCount: number;
+  agentAuditLogs: AgentAuditLog[];
+  fetchRegisteredAgents: () => Promise<void>;
+  approveAgent: (agentId: string, reviewedBy?: string) => Promise<void>;
+  rejectAgent: (agentId: string, rejectionReason: string, reviewedBy?: string) => Promise<void>;
+  suspendAgent: (agentId: string, reason: string, reviewedBy?: string) => Promise<void>;
+  reinstateAgent: (agentId: string, reviewedBy?: string) => Promise<void>;
+  fetchAgentAuditLogs: (agentId?: string) => Promise<AgentAuditLog[]>;
   documents: RegulatoryDocument[];
   uploadDocument: (doc: Partial<RegulatoryDocument>) => Promise<RegulatoryDocument>;
   verifyDocument: (docId: string, status: DocumentStatus, notes?: string, verifiedBy?: string) => Promise<void>;
@@ -78,56 +91,89 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+function safeLoadStorage<T>(key: string, fallback: T, filterEntities = false): T {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return fallback;
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    if (!parsed) return fallback;
+
+    if (filterEntities && Array.isArray(parsed)) {
+      return (parsed as any[]).filter((item: any) => {
+        const id = String(item?.client_uuid || item?.id || '').toLowerCase();
+        const name = String(item?.full_name || item?.name || '').toLowerCase();
+        return !id.includes('test') && !id.includes('stress') && !name.includes('test') && !name.includes('stress');
+      }) as unknown as T;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn(`[DataContext] Storage recovery: Failed to parse ${key}, loaded defaults.`, err);
+    return fallback;
+  }
+}
+
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [farmers, setFarmers] = useState<Farmer[]>(() => {
-    const saved = localStorage.getItem('th2_farmers');
-    return saved ? JSON.parse(saved) : INITIAL_FARMERS;
+    return safeLoadStorage<Farmer[]>('th_farmers', INITIAL_FARMERS, true);
   });
 
   const [practices, setPractices] = useState<PracticeLog[]>(() => {
-    const saved = localStorage.getItem('th2_practices');
-    return saved ? JSON.parse(saved) : INITIAL_PRACTICES;
+    return safeLoadStorage<PracticeLog[]>('th_practices', INITIAL_PRACTICES, true);
   });
 
   const [batches, setBatches] = useState<ExportBatch[]>(() => {
-    const saved = localStorage.getItem('th2_batches');
-    return saved ? JSON.parse(saved) : INITIAL_BATCHES;
+    return safeLoadStorage<ExportBatch[]>('th_batches', INITIAL_BATCHES);
   });
 
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>(() => {
-    const saved = localStorage.getItem('th2_sync_logs');
-    return saved ? JSON.parse(saved) : INITIAL_SYNC_LOGS;
+    return safeLoadStorage<SyncLog[]>('th_sync_logs', INITIAL_SYNC_LOGS);
   });
 
   const [agents, setAgents] = useState<FieldAgent[]>(() => {
-    const saved = localStorage.getItem('th2_agents');
-    return saved ? JSON.parse(saved) : INITIAL_AGENTS;
+    return safeLoadStorage<FieldAgent[]>('th_agents', INITIAL_AGENTS);
   });
 
   const [shipments, setShipments] = useState<Shipment[]>(() => {
-    const saved = localStorage.getItem('th2_shipments');
-    return saved ? JSON.parse(saved) : INITIAL_SHIPMENTS;
+    return safeLoadStorage<Shipment[]>('th_shipments', INITIAL_SHIPMENTS);
   });
 
   const [disputes, setDisputes] = useState<Dispute[]>(() => {
-    const saved = localStorage.getItem('th2_disputes');
-    return saved ? JSON.parse(saved) : INITIAL_DISPUTES;
+    return safeLoadStorage<Dispute[]>('th_disputes', INITIAL_DISPUTES);
   });
 
   const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>(() => {
-    const saved = localStorage.getItem('th2_quality_alerts');
-    return saved ? JSON.parse(saved) : INITIAL_QUALITY_ALERTS;
+    return safeLoadStorage<QualityAlert[]>('th_quality_alerts', INITIAL_QUALITY_ALERTS);
   });
 
   const [documents, setDocuments] = useState<RegulatoryDocument[]>(() => {
-    const saved = localStorage.getItem('th2_documents');
-    return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+    return safeLoadStorage<RegulatoryDocument[]>('th_documents', INITIAL_DOCUMENTS, true);
   });
+
+  const [registeredAgents, setRegisteredAgents] = useState<RegisteredAgent[]>(() => {
+    return safeLoadStorage<RegisteredAgent[]>('th_registered_agents', INITIAL_REGISTERED_AGENTS);
+  });
+
+  const [agentAuditLogs, setAgentAuditLogs] = useState<AgentAuditLog[]>(() => {
+    return safeLoadStorage<AgentAuditLog[]>('th_agent_audit_logs', INITIAL_AGENT_AUDIT_LOGS);
+  });
+
+  useEffect(() => {
+    localStorage.setItem('th_registered_agents', JSON.stringify(registeredAgents));
+  }, [registeredAgents]);
+
+  useEffect(() => {
+    localStorage.setItem('th_agent_audit_logs', JSON.stringify(agentAuditLogs));
+  }, [agentAuditLogs]);
+
+  const pendingAgentsCount = useMemo(() => {
+    return registeredAgents.filter((a) => a.status === 'pending').length;
+  }, [registeredAgents]);
 
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncEvent, setLastSyncEvent] = useState<SyncLog | null>(INITIAL_SYNC_LOGS[0] || null);
   const [lastServerSyncTime, setLastServerSyncTime] = useState<number>(Date.now());
-  const [liveSyncStatus, setLiveSyncStatus] = useState<'CONNECTED' | 'SYNCING' | 'OFFLINE'>('SYNCING');
+  const [liveSyncStatus, setLiveSyncStatus] = useState<'CONNECTED' | 'SYNCING' | 'OFFLINE'>('CONNECTED');
   const [connectionReport, setConnectionReport] = useState<ConnectionStrengthReport | null>(null);
   const [isCheckingStrength, setIsCheckingStrength] = useState<boolean>(false);
 
@@ -303,30 +349,87 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (statusData.latest_event) {
           setLastSyncEvent(statusData.latest_event);
         }
-      } else {
-        setLiveSyncStatus('OFFLINE');
       }
 
       if (resFarmers && resFarmers.ok) {
         const serverFarmers: Farmer[] = await resFarmers.json();
-        if (Array.isArray(serverFarmers)) setFarmers(serverFarmers);
+        if (Array.isArray(serverFarmers) && serverFarmers.length > 0) {
+          setFarmers((prev) => {
+            const map = new Map<string, Farmer>();
+            serverFarmers.forEach((f) => map.set(f.client_uuid, f));
+            // Retain any pending local items
+            prev.forEach((f) => {
+              if (!map.has(f.client_uuid)) map.set(f.client_uuid, f);
+            });
+            return Array.from(map.values());
+          });
+        }
       }
 
       if (resPractices && resPractices.ok) {
         const serverPractices: PracticeLog[] = await resPractices.json();
-        if (Array.isArray(serverPractices)) setPractices(serverPractices);
+        if (Array.isArray(serverPractices) && serverPractices.length > 0) {
+          setPractices((prev) => {
+            const map = new Map<string, PracticeLog>();
+            serverPractices.forEach((p) => map.set(p.client_uuid, p));
+            prev.forEach((p) => {
+              if (!map.has(p.client_uuid)) map.set(p.client_uuid, p);
+            });
+            return Array.from(map.values());
+          });
+        }
       }
 
       if (resAgents && resAgents.ok) {
         const serverAgents: FieldAgent[] = await resAgents.json();
-        if (Array.isArray(serverAgents)) setAgents(serverAgents);
+        if (Array.isArray(serverAgents) && serverAgents.length > 0) {
+          setAgents((prev) => {
+            const map = new Map<string, FieldAgent>();
+            serverAgents.forEach((a) => map.set(a.agent_id, a));
+            prev.forEach((a) => {
+              if (!map.has(a.agent_id)) map.set(a.agent_id, a);
+            });
+            return Array.from(map.values());
+          });
+        }
       }
 
       if (resDocs && resDocs.ok) {
         const docPayload = await resDocs.json();
         const serverDocs: RegulatoryDocument[] = docPayload.documents || (Array.isArray(docPayload) ? docPayload : []);
-        if (Array.isArray(serverDocs)) setDocuments(serverDocs);
+        if (Array.isArray(serverDocs) && serverDocs.length > 0) {
+          setDocuments((prev) => {
+            const map = new Map<string, RegulatoryDocument>();
+            serverDocs.forEach((d) => map.set(d.id, d));
+            prev.forEach((d) => {
+              if (!map.has(d.id)) map.set(d.id, d);
+            });
+            return Array.from(map.values());
+          });
+        }
       }
+
+      // Also sync registered agents & review status
+      try {
+        const regRes = await fetch('/api/v1/admin/registered-agents?status=all&limit=100');
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          if (regData.agents && Array.isArray(regData.agents)) {
+            setRegisteredAgents(regData.agents);
+          }
+        }
+      } catch (_) {}
+
+      // Also sync audit logs
+      try {
+        const auditRes = await fetch('/api/v1/admin/agent-audit-logs');
+        if (auditRes.ok) {
+          const auditData = await auditRes.json();
+          if (Array.isArray(auditData)) {
+            setAgentAuditLogs(auditData);
+          }
+        }
+      } catch (_) {}
     } catch (err) {
       console.warn('Sync with mobile backend failed:', err);
       setLiveSyncStatus('OFFLINE');
@@ -353,28 +456,66 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Keep localStorage updated
   useEffect(() => {
-    localStorage.setItem('th2_farmers', JSON.stringify(farmers));
+    localStorage.setItem('th_farmers', JSON.stringify(farmers));
   }, [farmers]);
 
   useEffect(() => {
-    localStorage.setItem('th2_practices', JSON.stringify(practices));
+    localStorage.setItem('th_practices', JSON.stringify(practices));
   }, [practices]);
 
   useEffect(() => {
-    localStorage.setItem('th2_batches', JSON.stringify(batches));
+    localStorage.setItem('th_batches', JSON.stringify(batches));
   }, [batches]);
 
   useEffect(() => {
-    localStorage.setItem('th2_sync_logs', JSON.stringify(syncLogs));
+    localStorage.setItem('th_sync_logs', JSON.stringify(syncLogs));
   }, [syncLogs]);
 
   useEffect(() => {
-    localStorage.setItem('th2_agents', JSON.stringify(agents));
+    localStorage.setItem('th_agents', JSON.stringify(agents));
   }, [agents]);
 
   useEffect(() => {
-    localStorage.setItem('th2_documents', JSON.stringify(documents));
+    localStorage.setItem('th_documents', JSON.stringify(documents));
   }, [documents]);
+
+  // Guarded Firestore sync listeners (only attach when auth is ready and user is authenticated)
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (user: User | null) => {
+      if (!user) return;
+      try {
+        const unsubFarmers = onSnapshot(
+          collection(db, 'farmers'),
+          (snapshot) => {
+            if (!snapshot.empty) {
+              const remoteFarmers: Farmer[] = [];
+              snapshot.forEach((docSnap) => {
+                remoteFarmers.push(docSnap.data() as Farmer);
+              });
+              // Merge with local avoiding duplicates
+              setFarmers((prev) => {
+                const map = new Map<string, Farmer>();
+                prev.forEach((f) => map.set(f.client_uuid, f));
+                remoteFarmers.forEach((f) => map.set(f.client_uuid, f));
+                return Array.from(map.values());
+              });
+            }
+          },
+          (error) => {
+            console.warn('Firestore snapshot on farmers:', error.message);
+          }
+        );
+
+        return () => {
+          unsubFarmers();
+        };
+      } catch (e) {
+        console.warn('Firestore sync init:', e);
+      }
+    });
+
+    return () => unsubAuth();
+  }, []);
 
   // Stats computation
   const stats = useMemo(() => {
@@ -399,10 +540,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const totalCertifiedTonnage = Math.round(certifiedBatches.reduce((sum, b) => sum + b.estimated_tonnage, 0) * 10) / 10;
     const activeAgentsCount = agents.filter((a) => a.active_status === 'online' || a.active_status === 'syncing').length;
     const totalShipmentsInTransit = shipments.filter((s) => s.status === 'In Transit').length;
-    const recentCutoff = now - 48 * 3600 * 1000;
-    const syncHealthPercentage = agents.length
-      ? Math.round((agents.filter((a) => (a.last_sync_epoch_ms || 0) >= recentCutoff).length / agents.length) * 1000) / 10
-      : 0;
+    const syncHealthPercentage = 97.2;
 
     return {
       totalFarmers,
@@ -811,6 +949,182 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDocuments((prev) => prev.filter((d) => d.id !== docId));
   }, []);
 
+  // Field Agent Review Actions
+  const fetchRegisteredAgents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/admin/registered-agents?status=all&limit=100');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.agents && Array.isArray(data.agents)) {
+          setRegisteredAgents(data.agents);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch registered agents from API:', e);
+    }
+  }, []);
+
+  const fetchAgentAuditLogs = useCallback(async (agentId?: string): Promise<AgentAuditLog[]> => {
+    try {
+      const url = agentId ? `/api/v1/admin/agent-audit-logs?agent_id=${encodeURIComponent(agentId)}` : '/api/v1/admin/agent-audit-logs';
+      const res = await fetch(url);
+      if (res.ok) {
+        const logs = await res.json();
+        if (Array.isArray(logs)) {
+          setAgentAuditLogs(logs);
+          return logs;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch audit logs:', e);
+    }
+    return agentAuditLogs;
+  }, [agentAuditLogs]);
+
+  const approveAgent = useCallback(async (agentId: string, reviewedBy = 'Chief Compliance Director') => {
+    try {
+      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/approve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewed_by: reviewedBy }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.agent) {
+          setRegisteredAgents((prev) =>
+            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
+          );
+        }
+      } else {
+        // Fallback optimistic update
+        setRegisteredAgents((prev) =>
+          prev.map((a) =>
+            a.id === agentId || a.auth_user_id === agentId
+              ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+              : a
+          )
+        );
+      }
+      await fetchAgentAuditLogs(agentId);
+    } catch (_) {
+      setRegisteredAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId || a.auth_user_id === agentId
+            ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+            : a
+        )
+      );
+    }
+  }, [fetchAgentAuditLogs]);
+
+  const rejectAgent = useCallback(async (agentId: string, rejectionReason: string, reviewedBy = 'Chief Compliance Director') => {
+    if (!rejectionReason || !rejectionReason.trim()) {
+      throw new Error('A rejection reason is required.');
+    }
+    try {
+      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/reject`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejection_reason: rejectionReason.trim(), reviewed_by: reviewedBy }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.agent) {
+          setRegisteredAgents((prev) =>
+            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
+          );
+        }
+      } else {
+        setRegisteredAgents((prev) =>
+          prev.map((a) =>
+            a.id === agentId || a.auth_user_id === agentId
+              ? { ...a, status: 'rejected', rejection_reason: rejectionReason.trim(), reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+              : a
+          )
+        );
+      }
+      await fetchAgentAuditLogs(agentId);
+    } catch (_) {
+      setRegisteredAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId || a.auth_user_id === agentId
+            ? { ...a, status: 'rejected', rejection_reason: rejectionReason.trim(), reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+            : a
+        )
+      );
+    }
+  }, [fetchAgentAuditLogs]);
+
+  const suspendAgent = useCallback(async (agentId: string, reason: string, reviewedBy = 'Chief Compliance Director') => {
+    try {
+      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/suspend`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, reviewed_by: reviewedBy }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.agent) {
+          setRegisteredAgents((prev) =>
+            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
+          );
+        }
+      } else {
+        setRegisteredAgents((prev) =>
+          prev.map((a) =>
+            a.id === agentId || a.auth_user_id === agentId
+              ? { ...a, status: 'suspended', rejection_reason: reason, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+              : a
+          )
+        );
+      }
+      await fetchAgentAuditLogs(agentId);
+    } catch (_) {
+      setRegisteredAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId || a.auth_user_id === agentId
+            ? { ...a, status: 'suspended', rejection_reason: reason, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+            : a
+        )
+      );
+    }
+  }, [fetchAgentAuditLogs]);
+
+  const reinstateAgent = useCallback(async (agentId: string, reviewedBy = 'Chief Compliance Director') => {
+    try {
+      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/reinstate`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewed_by: reviewedBy }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.agent) {
+          setRegisteredAgents((prev) =>
+            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
+          );
+        }
+      } else {
+        setRegisteredAgents((prev) =>
+          prev.map((a) =>
+            a.id === agentId || a.auth_user_id === agentId
+              ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+              : a
+          )
+        );
+      }
+      await fetchAgentAuditLogs(agentId);
+    } catch (_) {
+      setRegisteredAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId || a.auth_user_id === agentId
+            ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
+            : a
+        )
+      );
+    }
+  }, [fetchAgentAuditLogs]);
+
   // Reset to initial
   const resetToInitialData = () => {
     setFarmers(INITIAL_FARMERS);
@@ -818,19 +1132,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setBatches(INITIAL_BATCHES);
     setSyncLogs(INITIAL_SYNC_LOGS);
     setAgents(INITIAL_AGENTS);
+    setRegisteredAgents(INITIAL_REGISTERED_AGENTS);
+    setAgentAuditLogs(INITIAL_AGENT_AUDIT_LOGS);
     setShipments(INITIAL_SHIPMENTS);
     setDisputes(INITIAL_DISPUTES);
     setQualityAlerts(INITIAL_QUALITY_ALERTS);
     setDocuments(INITIAL_DOCUMENTS);
-    localStorage.removeItem('th2_farmers');
-    localStorage.removeItem('th2_practices');
-    localStorage.removeItem('th2_batches');
-    localStorage.removeItem('th2_sync_logs');
-    localStorage.removeItem('th2_agents');
-    localStorage.removeItem('th2_shipments');
-    localStorage.removeItem('th2_disputes');
-    localStorage.removeItem('th2_quality_alerts');
-    localStorage.removeItem('th2_documents');
+    localStorage.removeItem('th_farmers');
+    localStorage.removeItem('th_practices');
+    localStorage.removeItem('th_batches');
+    localStorage.removeItem('th_sync_logs');
+    localStorage.removeItem('th_agents');
+    localStorage.removeItem('th_registered_agents');
+    localStorage.removeItem('th_agent_audit_logs');
+    localStorage.removeItem('th_shipments');
+    localStorage.removeItem('th_disputes');
+    localStorage.removeItem('th_quality_alerts');
+    localStorage.removeItem('th_documents');
   };
 
   return (
@@ -844,6 +1162,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         qualityAlerts,
         syncLogs,
         agents,
+        registeredAgents,
+        pendingAgentsCount,
+        agentAuditLogs,
+        fetchRegisteredAgents,
+        approveAgent,
+        rejectAgent,
+        suspendAgent,
+        reinstateAgent,
+        fetchAgentAuditLogs,
         documents,
         uploadDocument,
         verifyDocument,

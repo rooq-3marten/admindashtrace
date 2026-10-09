@@ -26,6 +26,7 @@ import { useData } from '../../context/DataContext';
 
 export type TabType =
   | 'dashboard'
+  | 'pending_agents'
   | 'fleet'
   | 'farmers'
   | 'phi_sentinel'
@@ -72,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   onCloseMobile,
 }) => {
-  const { stats, disputes, batches, qualityAlerts, documents } = useData();
+  const { stats, disputes, batches, qualityAlerts, documents, pendingAgentsCount } = useData();
 
   const handleNavClick = (tab: TabType) => {
     setActiveTab(tab);
@@ -94,7 +95,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'OPERATIONS',
       items: [
-        { id: 'fleet' as TabType, label: 'Field Agents', icon: UserCheck, badge: `${stats.activeAgentsCount}`, badgeType: 'count' },
+        {
+          id: 'pending_agents' as TabType,
+          label: 'Pending Agents',
+          icon: UserCheck,
+          badge: pendingAgentsCount > 0 ? `${pendingAgentsCount} Pending` : undefined,
+          badgeType: 'warning',
+        },
+        { id: 'fleet' as TabType, label: 'Field Agents Fleet', icon: Users, badge: `${stats.activeAgentsCount}`, badgeType: 'count' },
         { id: 'farmers' as TabType, label: 'Farmers Enrolled', icon: Users, badge: stats.totalFarmers > 0 ? `${stats.totalFarmers}` : undefined, badgeType: 'count' },
         { id: 'phi_sentinel' as TabType, label: 'Practice Logs', icon: FileText, badge: stats.activePhiHolds > 0 ? `${stats.activePhiHolds} PHI` : undefined, badgeType: 'warning' },
         { id: 'batches' as TabType, label: 'Export Batches', icon: Package, badge: pendingBatchesCount > 0 ? `${pendingBatchesCount}` : undefined, badgeType: 'warning' },

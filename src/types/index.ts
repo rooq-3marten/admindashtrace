@@ -345,3 +345,67 @@ export interface ConnectionStrengthReport {
   verdict: string;
 }
 
+// ==============================================================================
+// Field Agent Self-Registration, Approval & Audit Types
+// ==============================================================================
+
+export type AgentStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+export interface RegisteredAgent {
+  id: string;
+  auth_user_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  association: string;
+  location: string;
+  status: AgentStatus;
+  rejection_reason?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Field statistics (populated once active)
+  total_farmers_enrolled?: number;
+  total_practices_logged?: number;
+}
+
+export interface AgentAuditLog {
+  id: string;
+  actor_id: string;
+  actor_name?: string;
+  action: 'self_register' | 'approve' | 'reject' | 'suspend' | 'reinstate' | 'profile_update';
+  target_agent_id: string;
+  target_agent_name?: string;
+  details: {
+    status?: AgentStatus;
+    from_status?: AgentStatus;
+    to_status?: AgentStatus;
+    rejection_reason?: string | null;
+    reviewed_by?: string | null;
+    reviewed_at?: string | null;
+    association?: string;
+    location?: string;
+    email?: string;
+    phone?: string;
+    notes?: string;
+  };
+  created_at: string;
+}
+
+export interface AgentRegistrationPayload {
+  full_name: string;
+  email: string;
+  phone: string;
+  association: string;
+  location: string;
+  password?: string;
+}
+
+export interface AgentReviewActionPayload {
+  action: 'approve' | 'reject' | 'suspend' | 'reinstate';
+  rejection_reason?: string;
+  notes?: string;
+  reviewed_by?: string;
+}
+

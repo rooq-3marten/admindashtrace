@@ -25,15 +25,18 @@ import { SystemHealthDashboard } from './components/system/SystemHealthDashboard
 import { AuditLogView } from './components/system/AuditLogView';
 import { MobileIntegrationGuide } from './components/guide/MobileIntegrationGuide';
 import { RbacManagement } from './components/admin/RbacManagement';
+import { PendingAgentsView } from './components/admin/PendingAgentsView';
 import { ExportersView } from './components/users/ExportersView';
 import { ReportsView } from './components/analytics/ReportsView';
 import { ExportsView } from './components/analytics/ExportsView';
 import { MobileSyncSimulator } from './components/simulator/MobileSyncSimulator';
 import { DocumentExpirySentinelView } from './components/compliance/DocumentExpirySentinelView';
 import { LandingPage } from './components/landing/LandingPage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const TAB_PATH_MAP: Record<TabType, string> = {
   dashboard: '/dashboard',
+  pending_agents: '/dashboard/pending-agents',
   fleet: '/dashboard/agents',
   farmers: '/dashboard/farmers',
   phi_sentinel: '/dashboard/practice-logs',
@@ -59,6 +62,8 @@ const PATH_TAB_MAP: Record<string, TabType> = {
   '': 'dashboard',
   'overview': 'dashboard',
   'dashboard': 'dashboard',
+  'pending-agents': 'pending_agents',
+  'pending_agents': 'pending_agents',
   'agents': 'fleet',
   'fleet': 'fleet',
   'farmers': 'farmers',
@@ -145,88 +150,94 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
 
         {/* Content View Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {activeTab === 'dashboard' && (
-            <AnalyticsDashboard
-              setActiveTab={setActiveTab}
-              onOpenSimulator={() => setIsSimulatorOpen(true)}
-            />
-          )}
+          <ErrorBoundary fallbackTitle="Dashboard Module Error">
+            {activeTab === 'dashboard' && (
+              <AnalyticsDashboard
+                setActiveTab={setActiveTab}
+                onOpenSimulator={() => setIsSimulatorOpen(true)}
+              />
+            )}
 
-          {activeTab === 'gis_map' && (
-            <GisMapViewer onSelectFarmer={() => {}} />
-          )}
+            {activeTab === 'pending_agents' && (
+              <PendingAgentsView />
+            )}
 
-          {activeTab === 'eudr_engine' && (
-            <EudrEngineView />
-          )}
+            {activeTab === 'gis_map' && (
+              <GisMapViewer onSelectFarmer={() => {}} />
+            )}
 
-          {activeTab === 'farmers' && (
-            <FarmersRegistry />
-          )}
+            {activeTab === 'eudr_engine' && (
+              <EudrEngineView />
+            )}
 
-          {activeTab === 'phi_sentinel' && (
-            <PhiSentinel />
-          )}
+            {activeTab === 'farmers' && (
+              <FarmersRegistry />
+            )}
 
-          {activeTab === 'expiry_sentinel' && (
-            <DocumentExpirySentinelView />
-          )}
+            {activeTab === 'phi_sentinel' && (
+              <PhiSentinel />
+            )}
 
-          {activeTab === 'batches' && (
-            <ExportBatches />
-          )}
+            {activeTab === 'expiry_sentinel' && (
+              <DocumentExpirySentinelView />
+            )}
 
-          {activeTab === 'documents' && (
-            <DocumentsVault />
-          )}
+            {activeTab === 'batches' && (
+              <ExportBatches />
+            )}
 
-          {activeTab === 'shipments' && (
-            <ShipmentsView />
-          )}
+            {activeTab === 'documents' && (
+              <DocumentsVault />
+            )}
 
-          {activeTab === 'data_quality' && (
-            <DataQualityDashboard />
-          )}
+            {activeTab === 'shipments' && (
+              <ShipmentsView />
+            )}
 
-          {activeTab === 'flags' && (
-            <QualityFlagsView />
-          )}
+            {activeTab === 'data_quality' && (
+              <DataQualityDashboard />
+            )}
 
-          {activeTab === 'disputes' && (
-            <DisputesView />
-          )}
+            {activeTab === 'flags' && (
+              <QualityFlagsView />
+            )}
 
-          {activeTab === 'fleet' && (
-            <FleetMonitor onOpenSimulator={() => setIsSimulatorOpen(true)} />
-          )}
+            {activeTab === 'disputes' && (
+              <DisputesView />
+            )}
 
-          {activeTab === 'system_health' && (
-            <SystemHealthDashboard />
-          )}
+            {activeTab === 'fleet' && (
+              <FleetMonitor onOpenSimulator={() => setIsSimulatorOpen(true)} />
+            )}
 
-          {activeTab === 'audit_log' && (
-            <AuditLogView />
-          )}
+            {activeTab === 'system_health' && (
+              <SystemHealthDashboard />
+            )}
 
-          {activeTab === 'mobile_guide' && (
-            <MobileIntegrationGuide />
-          )}
+            {activeTab === 'audit_log' && (
+              <AuditLogView />
+            )}
 
-          {activeTab === 'reports' && (
-            <ReportsView />
-          )}
+            {activeTab === 'mobile_guide' && (
+              <MobileIntegrationGuide />
+            )}
 
-          {activeTab === 'exports' && (
-            <ExportsView />
-          )}
+            {activeTab === 'reports' && (
+              <ReportsView />
+            )}
 
-          {activeTab === 'exporters' && (
-            <ExportersView />
-          )}
+            {activeTab === 'exports' && (
+              <ExportsView />
+            )}
 
-          {activeTab === 'rbac' && (
-            <RbacManagement />
-          )}
+            {activeTab === 'exporters' && (
+              <ExportersView />
+            )}
+
+            {activeTab === 'rbac' && (
+              <RbacManagement />
+            )}
+          </ErrorBoundary>
         </main>
       </div>
 
