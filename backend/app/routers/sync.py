@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-import random, json, hashlib
+import os, re, random, json, hashlib
 from app.database import get_db
 from app.models import Farmer, PracticeLog, Batch, Agent, SyncEvent, Document
 from app.schemas import BulkSyncRequest, BulkSyncResponse, SyncStatusResponse, SyncRecordResult
@@ -10,6 +10,21 @@ router = APIRouter(tags=["Synchronization Layer"])
 
 def now_utc():
     return datetime.now(timezone.utc)
+
+# --- Test-data guard ---------------------------------------------------------
+# Load/stress-test records must never reach the production database. A record is
+# treated as test data when its name starts with "Stress Farmer" or it comes from an
+# agent whose ID starts with "TEST-". Set ALLOW_TEST_DATA=true (e.g. on a staging
+# deployment) to switch the guard off.
+ALLOW_TEST_DATA = os.getenv("ALLOW_TEST_DATA", "false").strip().lower() in ("1", "true", "yes")
+_TEST_NAME_RE = re.compile(r"^\s*stress\s+farmer\b", re.IGNORECASE)
+
+def is_test_record(name, agent_id) -> bool:
+    if ALLOW_TEST_DATA:
+        return False
+    if agent_id and str(agent_id).upper().startswith("TEST-"):
+        return True
+    return bool(name and _TEST_NAME_RE.match(name))
 
 @router.post("/sync/batch", response_model=BulkSyncResponse)
 @router.post("/api/v1/sync/upstream", response_model=BulkSyncResponse)
@@ -46,9 +61,14 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
     synced_batches_count = 0
 
     # 1. Process Farmers
+    rejected_test_ids = set()
     for f in request.farmers:
         client_uuid = f.client_uuid or f.id
         if not client_uuid:
+            continue
+        if is_test_record(f.full_name or f.name, f.agent_id or agent_id):
+            rejected_test_ids.add(client_uuid)
+            results.append(SyncRecordResult(id=client_uuid, status="REJECTED_TEST_DATA", error="Test data is not accepted by this server"))
             continue
 
         existing = db.query(Farmer).filter(Farmer.id == client_uuid).first()
@@ -89,6 +109,9 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
     for p in request.practices:
         client_uuid = p.client_uuid or p.id
         if not client_uuid:
+            continue
+        if (p.farmer_client_uuid or p.farmer_id) in rejected_test_ids or is_test_record(None, p.agent_id or agent_id):
+            results.append(SyncRecordResult(id=client_uuid, status="REJECTED_TEST_DATA", error="Test data is not accepted by this server"))
             continue
 
         existing = db.query(PracticeLog).filter(PracticeLog.id == client_uuid).first()
