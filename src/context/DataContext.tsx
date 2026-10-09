@@ -115,55 +115,55 @@ function safeLoadStorage<T>(key: string, fallback: T, filterEntities = false): T
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [farmers, setFarmers] = useState<Farmer[]>(() => {
-    return safeLoadStorage<Farmer[]>('th_farmers', INITIAL_FARMERS, true);
+    return safeLoadStorage<Farmer[]>('th2_farmers', INITIAL_FARMERS, true);
   });
 
   const [practices, setPractices] = useState<PracticeLog[]>(() => {
-    return safeLoadStorage<PracticeLog[]>('th_practices', INITIAL_PRACTICES, true);
+    return safeLoadStorage<PracticeLog[]>('th2_practices', INITIAL_PRACTICES, true);
   });
 
   const [batches, setBatches] = useState<ExportBatch[]>(() => {
-    return safeLoadStorage<ExportBatch[]>('th_batches', INITIAL_BATCHES);
+    return safeLoadStorage<ExportBatch[]>('th2_batches', INITIAL_BATCHES);
   });
 
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>(() => {
-    return safeLoadStorage<SyncLog[]>('th_sync_logs', INITIAL_SYNC_LOGS);
+    return safeLoadStorage<SyncLog[]>('th2_sync_logs', INITIAL_SYNC_LOGS);
   });
 
   const [agents, setAgents] = useState<FieldAgent[]>(() => {
-    return safeLoadStorage<FieldAgent[]>('th_agents', INITIAL_AGENTS);
+    return safeLoadStorage<FieldAgent[]>('th2_agents', INITIAL_AGENTS);
   });
 
   const [shipments, setShipments] = useState<Shipment[]>(() => {
-    return safeLoadStorage<Shipment[]>('th_shipments', INITIAL_SHIPMENTS);
+    return safeLoadStorage<Shipment[]>('th2_shipments', INITIAL_SHIPMENTS);
   });
 
   const [disputes, setDisputes] = useState<Dispute[]>(() => {
-    return safeLoadStorage<Dispute[]>('th_disputes', INITIAL_DISPUTES);
+    return safeLoadStorage<Dispute[]>('th2_disputes', INITIAL_DISPUTES);
   });
 
   const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>(() => {
-    return safeLoadStorage<QualityAlert[]>('th_quality_alerts', INITIAL_QUALITY_ALERTS);
+    return safeLoadStorage<QualityAlert[]>('th2_quality_alerts', INITIAL_QUALITY_ALERTS);
   });
 
   const [documents, setDocuments] = useState<RegulatoryDocument[]>(() => {
-    return safeLoadStorage<RegulatoryDocument[]>('th_documents', INITIAL_DOCUMENTS, true);
+    return safeLoadStorage<RegulatoryDocument[]>('th2_documents', INITIAL_DOCUMENTS, true);
   });
 
   const [registeredAgents, setRegisteredAgents] = useState<RegisteredAgent[]>(() => {
-    return safeLoadStorage<RegisteredAgent[]>('th_registered_agents', INITIAL_REGISTERED_AGENTS);
+    return safeLoadStorage<RegisteredAgent[]>('th2_registered_agents', INITIAL_REGISTERED_AGENTS);
   });
 
   const [agentAuditLogs, setAgentAuditLogs] = useState<AgentAuditLog[]>(() => {
-    return safeLoadStorage<AgentAuditLog[]>('th_agent_audit_logs', INITIAL_AGENT_AUDIT_LOGS);
+    return safeLoadStorage<AgentAuditLog[]>('th2_agent_audit_logs', INITIAL_AGENT_AUDIT_LOGS);
   });
 
   useEffect(() => {
-    localStorage.setItem('th_registered_agents', JSON.stringify(registeredAgents));
+    localStorage.setItem('th2_registered_agents', JSON.stringify(registeredAgents));
   }, [registeredAgents]);
 
   useEffect(() => {
-    localStorage.setItem('th_agent_audit_logs', JSON.stringify(agentAuditLogs));
+    localStorage.setItem('th2_agent_audit_logs', JSON.stringify(agentAuditLogs));
   }, [agentAuditLogs]);
 
   const pendingAgentsCount = useMemo(() => {
@@ -173,7 +173,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncEvent, setLastSyncEvent] = useState<SyncLog | null>(INITIAL_SYNC_LOGS[0] || null);
   const [lastServerSyncTime, setLastServerSyncTime] = useState<number>(Date.now());
-  const [liveSyncStatus, setLiveSyncStatus] = useState<'CONNECTED' | 'SYNCING' | 'OFFLINE'>('CONNECTED');
+  const [liveSyncStatus, setLiveSyncStatus] = useState<'CONNECTED' | 'SYNCING' | 'OFFLINE'>('SYNCING');
   const [connectionReport, setConnectionReport] = useState<ConnectionStrengthReport | null>(null);
   const [isCheckingStrength, setIsCheckingStrength] = useState<boolean>(false);
 
@@ -349,64 +349,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (statusData.latest_event) {
           setLastSyncEvent(statusData.latest_event);
         }
+      } else {
+        setLiveSyncStatus('OFFLINE');
       }
 
+      // The backend database is the single source of truth: replace, never merge with local/cached rows.
       if (resFarmers && resFarmers.ok) {
         const serverFarmers: Farmer[] = await resFarmers.json();
-        if (Array.isArray(serverFarmers) && serverFarmers.length > 0) {
-          setFarmers((prev) => {
-            const map = new Map<string, Farmer>();
-            serverFarmers.forEach((f) => map.set(f.client_uuid, f));
-            // Retain any pending local items
-            prev.forEach((f) => {
-              if (!map.has(f.client_uuid)) map.set(f.client_uuid, f);
-            });
-            return Array.from(map.values());
-          });
-        }
+        if (Array.isArray(serverFarmers)) setFarmers(serverFarmers);
       }
 
       if (resPractices && resPractices.ok) {
         const serverPractices: PracticeLog[] = await resPractices.json();
-        if (Array.isArray(serverPractices) && serverPractices.length > 0) {
-          setPractices((prev) => {
-            const map = new Map<string, PracticeLog>();
-            serverPractices.forEach((p) => map.set(p.client_uuid, p));
-            prev.forEach((p) => {
-              if (!map.has(p.client_uuid)) map.set(p.client_uuid, p);
-            });
-            return Array.from(map.values());
-          });
-        }
+        if (Array.isArray(serverPractices)) setPractices(serverPractices);
       }
 
       if (resAgents && resAgents.ok) {
         const serverAgents: FieldAgent[] = await resAgents.json();
-        if (Array.isArray(serverAgents) && serverAgents.length > 0) {
-          setAgents((prev) => {
-            const map = new Map<string, FieldAgent>();
-            serverAgents.forEach((a) => map.set(a.agent_id, a));
-            prev.forEach((a) => {
-              if (!map.has(a.agent_id)) map.set(a.agent_id, a);
-            });
-            return Array.from(map.values());
-          });
-        }
+        if (Array.isArray(serverAgents)) setAgents(serverAgents);
       }
 
       if (resDocs && resDocs.ok) {
         const docPayload = await resDocs.json();
         const serverDocs: RegulatoryDocument[] = docPayload.documents || (Array.isArray(docPayload) ? docPayload : []);
-        if (Array.isArray(serverDocs) && serverDocs.length > 0) {
-          setDocuments((prev) => {
-            const map = new Map<string, RegulatoryDocument>();
-            serverDocs.forEach((d) => map.set(d.id, d));
-            prev.forEach((d) => {
-              if (!map.has(d.id)) map.set(d.id, d);
-            });
-            return Array.from(map.values());
-          });
-        }
+        if (Array.isArray(serverDocs)) setDocuments(serverDocs);
       }
 
       // Also sync registered agents & review status
@@ -456,66 +422,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Keep localStorage updated
   useEffect(() => {
-    localStorage.setItem('th_farmers', JSON.stringify(farmers));
+    localStorage.setItem('th2_farmers', JSON.stringify(farmers));
   }, [farmers]);
 
   useEffect(() => {
-    localStorage.setItem('th_practices', JSON.stringify(practices));
+    localStorage.setItem('th2_practices', JSON.stringify(practices));
   }, [practices]);
 
   useEffect(() => {
-    localStorage.setItem('th_batches', JSON.stringify(batches));
+    localStorage.setItem('th2_batches', JSON.stringify(batches));
   }, [batches]);
 
   useEffect(() => {
-    localStorage.setItem('th_sync_logs', JSON.stringify(syncLogs));
+    localStorage.setItem('th2_sync_logs', JSON.stringify(syncLogs));
   }, [syncLogs]);
 
   useEffect(() => {
-    localStorage.setItem('th_agents', JSON.stringify(agents));
+    localStorage.setItem('th2_agents', JSON.stringify(agents));
   }, [agents]);
 
   useEffect(() => {
-    localStorage.setItem('th_documents', JSON.stringify(documents));
+    localStorage.setItem('th2_documents', JSON.stringify(documents));
   }, [documents]);
-
-  // Guarded Firestore sync listeners (only attach when auth is ready and user is authenticated)
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user: User | null) => {
-      if (!user) return;
-      try {
-        const unsubFarmers = onSnapshot(
-          collection(db, 'farmers'),
-          (snapshot) => {
-            if (!snapshot.empty) {
-              const remoteFarmers: Farmer[] = [];
-              snapshot.forEach((docSnap) => {
-                remoteFarmers.push(docSnap.data() as Farmer);
-              });
-              // Merge with local avoiding duplicates
-              setFarmers((prev) => {
-                const map = new Map<string, Farmer>();
-                prev.forEach((f) => map.set(f.client_uuid, f));
-                remoteFarmers.forEach((f) => map.set(f.client_uuid, f));
-                return Array.from(map.values());
-              });
-            }
-          },
-          (error) => {
-            console.warn('Firestore snapshot on farmers:', error.message);
-          }
-        );
-
-        return () => {
-          unsubFarmers();
-        };
-      } catch (e) {
-        console.warn('Firestore sync init:', e);
-      }
-    });
-
-    return () => unsubAuth();
-  }, []);
 
   // Stats computation
   const stats = useMemo(() => {
@@ -540,7 +468,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const totalCertifiedTonnage = Math.round(certifiedBatches.reduce((sum, b) => sum + b.estimated_tonnage, 0) * 10) / 10;
     const activeAgentsCount = agents.filter((a) => a.active_status === 'online' || a.active_status === 'syncing').length;
     const totalShipmentsInTransit = shipments.filter((s) => s.status === 'In Transit').length;
-    const syncHealthPercentage = 97.2;
+    const recentCutoff = now - 48 * 3600 * 1000;
+    const syncHealthPercentage = agents.length
+      ? Math.round((agents.filter((a) => (a.last_sync_epoch_ms || 0) >= recentCutoff).length / agents.length) * 1000) / 10
+      : 0;
 
     return {
       totalFarmers,
@@ -1138,17 +1069,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDisputes(INITIAL_DISPUTES);
     setQualityAlerts(INITIAL_QUALITY_ALERTS);
     setDocuments(INITIAL_DOCUMENTS);
-    localStorage.removeItem('th_farmers');
-    localStorage.removeItem('th_practices');
-    localStorage.removeItem('th_batches');
-    localStorage.removeItem('th_sync_logs');
-    localStorage.removeItem('th_agents');
-    localStorage.removeItem('th_registered_agents');
-    localStorage.removeItem('th_agent_audit_logs');
-    localStorage.removeItem('th_shipments');
-    localStorage.removeItem('th_disputes');
-    localStorage.removeItem('th_quality_alerts');
-    localStorage.removeItem('th_documents');
+    localStorage.removeItem('th2_farmers');
+    localStorage.removeItem('th2_practices');
+    localStorage.removeItem('th2_batches');
+    localStorage.removeItem('th2_sync_logs');
+    localStorage.removeItem('th2_agents');
+    localStorage.removeItem('th2_registered_agents');
+    localStorage.removeItem('th2_agent_audit_logs');
+    localStorage.removeItem('th2_shipments');
+    localStorage.removeItem('th2_disputes');
+    localStorage.removeItem('th2_quality_alerts');
+    localStorage.removeItem('th2_documents');
   };
 
   return (
