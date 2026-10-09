@@ -912,149 +912,52 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return agentAuditLogs;
   }, [agentAuditLogs]);
 
-  const approveAgent = useCallback(async (agentId: string, reviewedBy = 'Chief Compliance Director') => {
-    try {
-      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/approve`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewed_by: reviewedBy }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.agent) {
-          setRegisteredAgents((prev) =>
-            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
-          );
-        }
-      } else {
-        // Fallback optimistic update
+  // Review actions are applied by the server only. If the server refuses or cannot be reached,
+  // the error is thrown so the screen can show it; the UI never pretends the action succeeded.
+  const runAgentAction = useCallback(
+    async (agentId: string, action: 'approve' | 'reject' | 'suspend' | 'reinstate', body: Record<string, unknown>) => {
+      let res: Response;
+      try {
+        res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/${action}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch {
+        throw new Error('Could not reach the server. The change was not saved.');
+      }
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        throw new Error(data.message || `The server could not ${action} this agent (HTTP ${res.status}).`);
+      }
+      if (data.agent) {
         setRegisteredAgents((prev) =>
-          prev.map((a) =>
-            a.id === agentId || a.auth_user_id === agentId
-              ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-              : a
-          )
+          prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
         );
       }
       await fetchAgentAuditLogs(agentId);
-    } catch (_) {
-      setRegisteredAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentId || a.auth_user_id === agentId
-            ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-            : a
-        )
-      );
-    }
-  }, [fetchAgentAuditLogs]);
+    },
+    [fetchAgentAuditLogs]
+  );
 
-  const rejectAgent = useCallback(async (agentId: string, rejectionReason: string, reviewedBy = 'Chief Compliance Director') => {
-    if (!rejectionReason || !rejectionReason.trim()) {
-      throw new Error('A rejection reason is required.');
-    }
-    try {
-      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/reject`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rejection_reason: rejectionReason.trim(), reviewed_by: reviewedBy }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.agent) {
-          setRegisteredAgents((prev) =>
-            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
-          );
-        }
-      } else {
-        setRegisteredAgents((prev) =>
-          prev.map((a) =>
-            a.id === agentId || a.auth_user_id === agentId
-              ? { ...a, status: 'rejected', rejection_reason: rejectionReason.trim(), reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-              : a
-          )
-        );
-      }
-      await fetchAgentAuditLogs(agentId);
-    } catch (_) {
-      setRegisteredAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentId || a.auth_user_id === agentId
-            ? { ...a, status: 'rejected', rejection_reason: rejectionReason.trim(), reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-            : a
-        )
-      );
-    }
-  }, [fetchAgentAuditLogs]);
-
-  const suspendAgent = useCallback(async (agentId: string, reason: string, reviewedBy = 'Chief Compliance Director') => {
-    try {
-      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/suspend`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, reviewed_by: reviewedBy }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.agent) {
-          setRegisteredAgents((prev) =>
-            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
-          );
-        }
-      } else {
-        setRegisteredAgents((prev) =>
-          prev.map((a) =>
-            a.id === agentId || a.auth_user_id === agentId
-              ? { ...a, status: 'suspended', rejection_reason: reason, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-              : a
-          )
-        );
-      }
-      await fetchAgentAuditLogs(agentId);
-    } catch (_) {
-      setRegisteredAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentId || a.auth_user_id === agentId
-            ? { ...a, status: 'suspended', rejection_reason: reason, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-            : a
-        )
-      );
-    }
-  }, [fetchAgentAuditLogs]);
-
-  const reinstateAgent = useCallback(async (agentId: string, reviewedBy = 'Chief Compliance Director') => {
-    try {
-      const res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/reinstate`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewed_by: reviewedBy }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.agent) {
-          setRegisteredAgents((prev) =>
-            prev.map((a) => (a.id === agentId || a.auth_user_id === agentId ? { ...a, ...data.agent } : a))
-          );
-        }
-      } else {
-        setRegisteredAgents((prev) =>
-          prev.map((a) =>
-            a.id === agentId || a.auth_user_id === agentId
-              ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-              : a
-          )
-        );
-      }
-      await fetchAgentAuditLogs(agentId);
-    } catch (_) {
-      setRegisteredAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentId || a.auth_user_id === agentId
-            ? { ...a, status: 'approved', rejection_reason: null, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }
-            : a
-        )
-      );
-    }
-  }, [fetchAgentAuditLogs]);
+  const approveAgent = useCallback(
+    (agentId: string, reviewedBy = 'Dashboard admin') => runAgentAction(agentId, 'approve', { reviewed_by: reviewedBy }),
+    [runAgentAction]
+  );
+  const rejectAgent = useCallback(
+    (agentId: string, rejectionReason: string, reviewedBy = 'Dashboard admin') =>
+      runAgentAction(agentId, 'reject', { rejection_reason: rejectionReason, reviewed_by: reviewedBy }),
+    [runAgentAction]
+  );
+  const suspendAgent = useCallback(
+    (agentId: string, reason: string, reviewedBy = 'Dashboard admin') =>
+      runAgentAction(agentId, 'suspend', { reason, reviewed_by: reviewedBy }),
+    [runAgentAction]
+  );
+  const reinstateAgent = useCallback(
+    (agentId: string, reviewedBy = 'Dashboard admin') => runAgentAction(agentId, 'reinstate', { reviewed_by: reviewedBy }),
+    [runAgentAction]
+  );
 
   // Reset to initial
   const resetToInitialData = () => {
