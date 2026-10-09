@@ -45,6 +45,19 @@ class Agent(Base):
     device_id = Column(String(100), nullable=True)
     last_sync_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Self-registration / review workflow (status: pending | approved | rejected | suspended;
+    # legacy "ACTIVE" rows created by sync are treated as approved)
+    auth_user_id = Column(String(80), nullable=True)
+    association = Column(String(150), nullable=True)
+    location = Column(String(200), nullable=True)
+    assigned_lga = Column(String(100), nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    reviewed_by = Column(String(150), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    password_hash = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+
     farmers = relationship("Farmer", back_populates="enrolled_by_agent")
     practice_logs = relationship("PracticeLog", back_populates="agent")
     batches = relationship("Batch", back_populates="agent")
@@ -171,3 +184,17 @@ class Document(Base):
     created_at = Column(DateTime(timezone=True), default=now_utc)
     synced_at = Column(DateTime(timezone=True), default=now_utc)
 
+
+class AgentAuditLog(Base):
+    """Append-only trail of every agent registration / review action."""
+    __tablename__ = "agent_audit_logs"
+
+    id = Column(String(64), primary_key=True, index=True)
+    actor_id = Column(String(150), nullable=False)
+    actor_name = Column(String(150), nullable=True)
+    actor_ip = Column(String(64), nullable=True, index=True)
+    action = Column(String(30), nullable=False)
+    target_agent_id = Column(String(64), nullable=False, index=True)
+    target_agent_name = Column(String(150), nullable=True)
+    details = Column(Text, nullable=True)  # JSON object as text
+    created_at = Column(DateTime(timezone=True), nullable=False, index=True)
