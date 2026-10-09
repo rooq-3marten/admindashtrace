@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 import os, re, random, json, hashlib
 from app.database import get_db
 from app.models import Farmer, PracticeLog, Batch, Agent, SyncEvent, Document
+from app.routers.agent_accounts import norm_status
 from app.schemas import BulkSyncRequest, BulkSyncResponse, SyncStatusResponse, SyncRecordResult
 
 router = APIRouter(tags=["Synchronization Layer"])
@@ -36,6 +38,17 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
     """
     agent_id = request.agent_id or "AGENT-NG-042"
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    # Only approved agents may upload field records (README: pending/rejected/suspended -> 403).
+    # Agents created before the approval workflow existed have status "ACTIVE" and count as approved.
+    if agent is not None and norm_status(agent.status) != "approved":
+        current = norm_status(agent.status)
+        return JSONResponse(status_code=403, content={
+            "error": "ACCOUNT_NOT_APPROVED",
+            "status": current,
+            "rejection_reason": agent.rejection_reason,
+            "message": f"Access denied. Field agent account status is '{current}'. "
+                       "Only approved agents can synchronize farm records or access operational data.",
+        })
     if not agent:
         # Create agent record if new
         agent = Agent(
@@ -45,12 +58,12 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
             state = "Kano",
             status = "ACTIVE",
             device_id = request.device_id,
-            last_sync_at = now_utc()
+            last_sync_at = now_utc(),
+            created_at = now_utc()
         )
         db.add(agent)
     else:
         agent.last_sync_at = now_utc()
-        agent.status = "ACTIVE"
         if request.device_id:
             agent.device_id = request.device_id
 
