@@ -18,6 +18,10 @@ def now_utc():
 # treated as test data when its name starts with "Stress Farmer" or it comes from an
 # agent whose ID starts with "TEST-". Set ALLOW_TEST_DATA=true (e.g. on a staging
 # deployment) to switch the guard off.
+# Agents must exist (i.e. have registered and been approved) before they can upload records.
+# Set ALLOW_UNREGISTERED_AGENTS=true to restore the old behaviour of auto-creating any agent ID
+# seen in a sync request (not recommended: it lets anyone invent an approved agent).
+ALLOW_UNREGISTERED_AGENTS = os.getenv("ALLOW_UNREGISTERED_AGENTS", "false").strip().lower() in ("1", "true", "yes")
 ALLOW_TEST_DATA = os.getenv("ALLOW_TEST_DATA", "false").strip().lower() in ("1", "true", "yes")
 _TEST_NAME_RE = re.compile(r"^\s*stress\s+farmer\b", re.IGNORECASE)
 
@@ -40,6 +44,13 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     # Only approved agents may upload field records (README: pending/rejected/suspended -> 403).
     # Agents created before the approval workflow existed have status "ACTIVE" and count as approved.
+    if agent is None and not ALLOW_UNREGISTERED_AGENTS:
+        return JSONResponse(status_code=403, content={
+            "error": "AGENT_NOT_REGISTERED",
+            "status": "unregistered",
+            "rejection_reason": None,
+            "message": "This agent ID is not registered. Register in the app and wait for approval before syncing.",
+        })
     if agent is not None and norm_status(agent.status) != "approved":
         current = norm_status(agent.status)
         return JSONResponse(status_code=403, content={
