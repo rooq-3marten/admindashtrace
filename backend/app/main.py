@@ -24,6 +24,7 @@ NEW_COLUMNS = {
         "assigned_lga": "VARCHAR(100)", "rejection_reason": "TEXT", "reviewed_by": "VARCHAR(150)",
         "reviewed_at": "TIMESTAMP WITH TIME ZONE", "password_hash": "VARCHAR(255)",
         "created_at": "TIMESTAMP WITH TIME ZONE", "updated_at": "TIMESTAMP WITH TIME ZONE",
+        "failed_login_count": "INTEGER", "locked_until": "TIMESTAMP WITH TIME ZONE",
     },
 }
 
