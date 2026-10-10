@@ -15,12 +15,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
+from jose import JWTError, jwt
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import get_password_hash
+from app.auth import create_access_token, get_password_hash, verify_password
+from app.config import settings
 from app.database import get_db
 from app.models import Agent, AgentAuditLog, Farmer, PracticeLog
 
@@ -150,12 +152,10 @@ def next_agent_id(db: Session) -> str:
 # ----------------------------------------------------------------------------
 # 1. Mobile self-registration
 # ----------------------------------------------------------------------------
-@router.post("/auth/agent-register", status_code=201)
-@router.post("/agents/register", status_code=201)
-@router.post("/api/v1/auth/agent-register", status_code=201)
-@router.post("/api/v1/agents/register", status_code=201)
-def register_agent(request: Request, body: Optional[dict] = None, db: Session = Depends(get_db)):
-    body = body or {}
+def _register_core(request: Request, body: dict, db: Session):
+    """Validates and creates a pending agent. Returns the Agent, or a JSONResponse error."""
+    if not body.get("phone") and body.get("phone_number"):
+        body = {**body, "phone": body["phone_number"]}  # the Android app sends phone_number
     ip = client_ip(request)
 
     since = now_utc() - SIGNUP_WINDOW
@@ -236,12 +236,130 @@ def register_agent(request: Request, body: Optional[dict] = None, db: Session = 
     db.commit()
     db.refresh(agent)
 
+    return agent
+
+
+@router.post("/auth/agent-register", status_code=201)
+@router.post("/agents/register", status_code=201)
+@router.post("/api/v1/auth/agent-register", status_code=201)
+@router.post("/api/v1/agents/register", status_code=201)
+def register_agent(request: Request, body: Optional[dict] = None, db: Session = Depends(get_db)):
+    result = _register_core(request, body or {}, db)
+    if isinstance(result, JSONResponse):
+        return result
     return {
         "status": "pending",
         "message": "Field agent registration submitted successfully. Your account is pending administrative "
                    "review. You will receive an email once approved.",
-        "agent": serialize_agent(db, agent),
+        "agent": serialize_agent(db, result),
     }
+
+
+# ----------------------------------------------------------------------------
+# 1b. Routes used by the Android app (flat response shape + agent session token)
+# ----------------------------------------------------------------------------
+def issue_agent_token(agent: Agent) -> str:
+    return create_access_token(
+        data={"sub": agent.id, "role": "agent", "name": agent.name},
+        expires_delta=timedelta(days=7),
+    )
+
+
+def flat_status(agent: Agent, token: Optional[str] = None) -> dict:
+    return {
+        "agent_id": agent.id,
+        "full_name": agent.name,
+        "email": agent.email or "",
+        "association": agent.association or agent.cooperative or "",
+        "location": agent.location or agent.state or "",
+        "phone_number": agent.phone,
+        "status": norm_status(agent.status),
+        "rejection_reason": agent.rejection_reason,
+        "access_token": token,
+    }
+
+
+def agent_from_token(request: Request, db: Session):
+    """Returns the Agent for a valid agent Bearer token, or a 401 JSONResponse."""
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer "):
+        return error(401, "UNAUTHENTICATED", "Sign in to continue.")
+    try:
+        payload = jwt.decode(header[7:].strip(), settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        return error(401, "TOKEN_EXPIRED", "Your session has expired. Please sign in again.")
+    if payload.get("role") != "agent" or not payload.get("sub"):
+        return error(401, "UNAUTHENTICATED", "This session is not a field agent session.")
+    agent = db.query(Agent).filter(Agent.id == payload["sub"]).first()
+    if not agent:
+        return error(401, "UNAUTHENTICATED", "This agent account no longer exists.")
+    return agent
+
+
+@router.post("/auth/agent/signup", status_code=201)
+@router.post("/api/v1/auth/agent/signup", status_code=201)
+def agent_signup(request: Request, body: Optional[dict] = None, db: Session = Depends(get_db)):
+    result = _register_core(request, body or {}, db)
+    if isinstance(result, JSONResponse):
+        return result
+    return flat_status(result, token=issue_agent_token(result))
+
+
+@router.get("/auth/agent/status")
+@router.get("/api/v1/auth/agent/status")
+def agent_status(request: Request, db: Session = Depends(get_db)):
+    agent = agent_from_token(request, db)
+    if isinstance(agent, JSONResponse):
+        return agent
+    return flat_status(agent)
+
+
+@router.post("/auth/agent/resubmit")
+@router.post("/api/v1/auth/agent/resubmit")
+def agent_resubmit(request: Request, body: Optional[dict] = None, db: Session = Depends(get_db)):
+    agent = agent_from_token(request, db)
+    if isinstance(agent, JSONResponse):
+        return agent
+    body = body or {}
+    if norm_status(agent.status) != "rejected":
+        return error(409, "NOT_RESUBMITTABLE", "Only rejected applications can be resubmitted.")
+
+    def text(key):
+        v = body.get(key)
+        return v.strip() if isinstance(v, str) else ""
+
+    name, assoc, loc = text("full_name"), text("association"), text("location")
+    if not (name and assoc and loc and (text("phone_number") or text("phone"))):
+        return error(400, "VALIDATION_ERROR", "Name, association, location and phone number are all required.")
+    phone = validate_phone(text("phone_number") or text("phone"))
+    if not phone:
+        return error(400, "INVALID_PHONE_FORMAT", "Invalid Nigerian phone number.")
+    if db.query(Agent).filter(Agent.phone == phone, Agent.id != agent.id).first():
+        return error(409, "DUPLICATE_PHONE", "An agent account with this phone number already exists.")
+    password = body.get("password")
+    if isinstance(password, str) and password:
+        if len(password) < 6:
+            return error(400, "WEAK_PASSWORD", "Password must be at least 6 characters long.")
+        agent.password_hash = get_password_hash(password)
+
+    parts = [p.strip() for p in loc.split(",")]
+    previous_reason = agent.rejection_reason
+    agent.name, agent.phone = name, phone
+    agent.association = assoc[:150]
+    agent.cooperative = assoc[:150]
+    agent.location = loc[:200]
+    agent.state = ((loc.split("State")[0].strip() if "State" in loc else parts[0]) or loc)[:50]
+    agent.assigned_lga = (parts[1] if len(parts) > 1 else "")[:100]
+    agent.status = "pending"
+    agent.rejection_reason = None
+    agent.updated_at = now_utc()
+    record_audit(db, actor_id=agent.auth_user_id or agent.id, actor_name=agent.name, action="profile_update",
+                 agent=agent, ip=client_ip(request),
+                 details={"resubmitted": True, "from_status": "rejected", "to_status": "pending",
+                          "previous_rejection_reason": previous_reason})
+    db.commit()
+    db.refresh(agent)
+    return flat_status(agent)
 
 
 # ----------------------------------------------------------------------------
