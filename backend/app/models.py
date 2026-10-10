@@ -57,6 +57,8 @@ class Agent(Base):
     password_hash = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), nullable=True)
+    failed_login_count = Column(Integer, nullable=True, default=0)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
 
     farmers = relationship("Farmer", back_populates="enrolled_by_agent")
     practice_logs = relationship("PracticeLog", back_populates="agent")
