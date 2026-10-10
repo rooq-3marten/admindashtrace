@@ -1,12 +1,52 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
+from sqlalchemy import func, or_
 from app.database import get_db
 from app.models import User, Agent
 from app.schemas import LoginRequest, Token, UserOut
 from app.auth import verify_password, create_access_token, create_refresh_token, get_password_hash, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+def _find_agent_for_login(db: Session, identifier: str):
+    ident = (identifier or "").strip()
+    if not ident:
+        return None
+    from app.routers.agent_accounts import validate_phone
+    conds = [func.lower(Agent.email) == ident.lower(), Agent.id == ident]
+    phone = validate_phone(ident)
+    if phone:
+        conds.append(Agent.phone == phone)
+    return db.query(Agent).filter(or_(*conds)).first()
+
+
+def _agent_login(db: Session, agent: Agent, password: str) -> Token:
+    """Password-checked agent login. Pending/rejected/suspended agents may sign in
+    (so the app can show their status); only sync is blocked for them."""
+    bad = HTTPException(status_code=401, detail={"error": "INVALID_CREDENTIALS",
+                                                 "message": "That email or password doesn't match our records."})
+    now = datetime.now(timezone.utc)
+    locked = agent.locked_until
+    if locked is not None and (locked if locked.tzinfo else locked.replace(tzinfo=timezone.utc)) > now:
+        raise HTTPException(status_code=429, detail={"error": "RATE_LIMIT_EXCEEDED",
+                            "message": "Too many failed sign-in attempts. Please wait 15 minutes and try again."})
+    # Accounts without a password (created by device sync, not by registration) cannot sign in.
+    if not agent.password_hash or not verify_password(password or "", agent.password_hash):
+        agent.failed_login_count = (agent.failed_login_count or 0) + 1
+        if agent.failed_login_count >= 8:
+            agent.locked_until = now + timedelta(minutes=15)
+            agent.failed_login_count = 0
+        db.commit()
+        raise bad
+    agent.failed_login_count = 0
+    agent.locked_until = None
+    db.commit()
+    access = create_access_token(data={"sub": agent.id, "role": "agent", "name": agent.name},
+                                 expires_delta=timedelta(days=7))
+    refresh = create_refresh_token(data={"sub": agent.id, "role": "agent"})
+    return Token(access_token=access, refresh_token=refresh, expires_in=604800)
+
 
 @router.post("/login", response_model=Token)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
@@ -17,14 +57,11 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == credentials.username).first()
     
     if not user:
-        # Check if username is an agent ID (e.g. AGENT-NG-042)
-        agent = db.query(Agent).filter(Agent.id == credentials.username).first()
+        # Field agents sign in with email (or phone, or agent ID) + password.
+        agent = _find_agent_for_login(db, credentials.username)
         if agent:
-            # Grant agent token
-            access_token = create_access_token(data={"sub": agent.id, "role": "agent", "name": agent.name})
-            refresh_token = create_refresh_token(data={"sub": agent.id, "role": "agent"})
-            return Token(access_token=access_token, refresh_token=refresh_token, expires_in=604800)
-        
+            return _agent_login(db, agent, credentials.password)
+
         # If default admin credentials provided during initial setup
         if credentials.username == "admin@traceharvest.ng" and credentials.password == "TraceHarvest2026!":
             new_user = User(
