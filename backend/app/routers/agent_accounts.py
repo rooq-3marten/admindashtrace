@@ -9,20 +9,21 @@ SHA-256), everything lives in the database (no in-memory state), and rate limiti
 database-backed so it also works on serverless.
 """
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from jose import JWTError, jwt
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, get_password_hash, verify_password
-from app.config import settings
+from app.auth import create_access_token, create_refresh_token, get_password_hash, verify_password
+from app.mailer import send_agent_status_email
+from app.security import (AdminIdentity, ApiError, agent_claims, enforce_agent_token, flag, require_admin)
 from app.database import get_db
 from app.models import Agent, AgentAuditLog, Farmer, PracticeLog
 
@@ -281,16 +282,11 @@ def flat_status(agent: Agent, token: Optional[str] = None) -> dict:
 
 def agent_from_token(request: Request, db: Session):
     """Returns the Agent for a valid agent Bearer token, or a 401 JSONResponse."""
-    header = request.headers.get("authorization", "")
-    if not header.lower().startswith("bearer "):
-        return error(401, "UNAUTHENTICATED", "Sign in to continue.")
     try:
-        payload = jwt.decode(header[7:].strip(), settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    except JWTError:
-        return error(401, "TOKEN_EXPIRED", "Your session has expired. Please sign in again.")
-    if payload.get("role") != "agent" or not payload.get("sub"):
-        return error(401, "UNAUTHENTICATED", "This session is not a field agent session.")
-    agent = db.query(Agent).filter(Agent.id == payload["sub"]).first()
+        claims = agent_claims(request)
+    except ApiError as exc:
+        return error(exc.status_code, exc.code, exc.message)
+    agent = db.query(Agent).filter(Agent.id == claims["sub"]).first()
     if not agent:
         return error(401, "UNAUTHENTICATED", "This agent account no longer exists.")
     return agent
@@ -363,6 +359,93 @@ def agent_resubmit(request: Request, body: Optional[dict] = None, db: Session = 
 
 
 # ----------------------------------------------------------------------------
+# 1c. Agent login (shared by /auth/login and /auth/agent-login)
+# ----------------------------------------------------------------------------
+def find_agent_for_login(db: Session, identifier: str) -> Optional[Agent]:
+    ident = (identifier or "").strip()
+    if not ident:
+        return None
+    conds = [func.lower(Agent.email) == ident.lower(), Agent.id == ident]
+    phone = validate_phone(ident)
+    if phone:
+        conds.append(Agent.phone == phone)
+    return db.query(Agent).filter(or_(*conds)).first()
+
+
+def agent_login_core(db: Session, agent: Agent, password: str) -> dict:
+    """
+    Password-checked login. Pending/rejected/suspended agents may sign in so the app can show
+    their status; only syncing is blocked for them. Raises ApiError on failure.
+    """
+    now = now_utc()
+    locked = _aware(agent.locked_until)
+    if locked is not None and locked > now:
+        raise ApiError(429, "RATE_LIMIT_EXCEEDED", "Too many failed sign-in attempts. Please wait 15 minutes and try again.")
+    # Accounts created by device sync (no registration) have no password and cannot sign in.
+    if not agent.password_hash or not verify_password(password or "", agent.password_hash):
+        agent.failed_login_count = (agent.failed_login_count or 0) + 1
+        if agent.failed_login_count >= 8:
+            agent.locked_until = now + timedelta(minutes=15)
+            agent.failed_login_count = 0
+        db.commit()
+        raise ApiError(401, "INVALID_CREDENTIALS", "That email or password doesn't match our records.")
+    agent.failed_login_count = 0
+    agent.locked_until = None
+    db.commit()
+    return {
+        "access_token": issue_agent_token(agent),
+        "refresh_token": create_refresh_token(data={"sub": agent.id, "role": "agent"}),
+        "expires_in": 604800,
+    }
+
+
+@router.post("/auth/agent-login")
+@router.post("/api/v1/auth/agent-login")
+def agent_login(body: Optional[dict] = None, db: Session = Depends(get_db)):
+    body = body or {}
+    agent = find_agent_for_login(db, body.get("email") or body.get("username") or "")
+    if not agent:
+        raise ApiError(401, "INVALID_CREDENTIALS", "That email or password doesn't match our records.")
+    tokens = agent_login_core(db, agent, body.get("password") or "")
+    return {
+        "access_token": tokens["access_token"],
+        "token_type": "bearer",
+        "expires_in": tokens["expires_in"],
+        "status": norm_status(agent.status),
+        "rejection_reason": agent.rejection_reason,
+        "agent": {
+            "id": agent.id, "agent_id": agent.id, "full_name": agent.name,
+            "email": agent.email or "", "status": norm_status(agent.status),
+        },
+    }
+
+
+def agent_write_gate(request: Request, db: Session, agent_id: Optional[str]) -> str:
+    """
+    Gate for the app's direct-write routes (POST /farmers, /practice-logs, /batches), the same
+    rules as syncing: the agent must be identified, registered and approved. Returns the agent ID.
+    """
+    token_agent = enforce_agent_token(request, agent_id)  # None while REQUIRE_AGENT_AUTH is off
+    resolved = agent_id or token_agent
+    if not resolved:
+        raise ApiError(400, "AGENT_ID_REQUIRED", "agent_id is required.")
+    agent = db.query(Agent).filter(Agent.id == resolved).first()
+    if agent is None:
+        if os.getenv("ALLOW_UNREGISTERED_AGENTS", "false").strip().lower() in ("1", "true", "yes"):
+            return resolved
+        raise ApiError(403, "AGENT_NOT_REGISTERED",
+                       "This agent ID is not registered. Register in the app and wait for approval before syncing.",
+                       status="unregistered", rejection_reason=None)
+    current = norm_status(agent.status)
+    if current != "approved":
+        raise ApiError(403, "ACCOUNT_NOT_APPROVED",
+                       f"Access denied. Field agent account status is '{current}'. "
+                       "Only approved agents can synchronize farm records or access operational data.",
+                       status=current, rejection_reason=agent.rejection_reason)
+    return resolved
+
+
+# ----------------------------------------------------------------------------
 # 2. Agent checks their own approval status
 # ----------------------------------------------------------------------------
 @router.get("/agents/me")
@@ -396,7 +479,8 @@ def agent_me(email: Optional[str] = None, agent_id: Optional[str] = None, db: Se
 @router.get("/api/v1/admin/registered-agents")
 def list_registered_agents(status: Optional[str] = None, association: Optional[str] = None,
                            location: Optional[str] = None, search: Optional[str] = None,
-                           page: int = 1, limit: int = 20, db: Session = Depends(get_db)):
+                           page: int = 1, limit: int = 20, db: Session = Depends(get_db),
+                           admin: AdminIdentity = Depends(require_admin)):
     everyone = db.query(Agent).all()
     counts = {s: 0 for s in VALID_STATUSES}
     for a in everyone:
@@ -440,13 +524,22 @@ def list_registered_agents(status: Optional[str] = None, association: Optional[s
 # ----------------------------------------------------------------------------
 # 4. Admin: review actions
 # ----------------------------------------------------------------------------
-def _review(db: Session, agent_ident: str, *, action: str, new_status: str, body: dict,
+def _reviewer(admin: AdminIdentity, body: dict) -> str:
+    """The signed-in administrator. A name sent in the request body is only honoured while
+    admin sign-in is not yet enforced, and never overrides a verified identity."""
+    if admin.authenticated:
+        return admin.display
+    if flag("REQUIRE_ADMIN_AUTH"):
+        return admin.display  # unreachable: the dependency already rejected the request
+    return (body.get("reviewed_by") or DEFAULT_REVIEWER).strip() or DEFAULT_REVIEWER
+
+
+def _review(db: Session, agent_ident: str, *, action: str, new_status: str, reviewer: str,
             reason: Optional[str] = None, clear_reason: bool = False):
     agent = find_agent(db, agent_ident)
     if not agent:
         return error(404, "AGENT_NOT_FOUND", f"Agent with ID {agent_ident} not found.")
 
-    reviewer = (body.get("reviewed_by") or DEFAULT_REVIEWER).strip() or DEFAULT_REVIEWER
     previous = norm_status(agent.status)
     stamp = now_utc()
 
@@ -470,49 +563,68 @@ def _review(db: Session, agent_ident: str, *, action: str, new_status: str, body
     return agent
 
 
+def _respond(db: Session, agent: Agent, message: str, mail_action: str, reason: Optional[str] = None) -> dict:
+    # The decision is already saved; the e-mail can fail without undoing it.
+    outcome = send_agent_status_email(to=agent.email, name=agent.name, action=mail_action, reason=reason)
+    return {
+        "success": True,
+        "message": message,
+        "agent": serialize_agent(db, agent),
+        "notification": {"email": outcome, "recipient": agent.email or ""},
+    }
+
+
 @router.patch("/admin/agents/{agent_ident}/approve")
 @router.patch("/api/v1/admin/agents/{agent_ident}/approve")
-def approve_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db)):
+def approve_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db),
+                  admin: AdminIdentity = Depends(require_admin)):
     body = body or {}
-    result = _review(db, agent_ident, action="approve", new_status="approved", body=body, clear_reason=True)
+    result = _review(db, agent_ident, action="approve", new_status="approved",
+                     reviewer=_reviewer(admin, body), clear_reason=True)
     if isinstance(result, JSONResponse):
         return result
-    return {"success": True, "message": f"Agent {result.name} successfully approved.", "agent": serialize_agent(db, result)}
+    return _respond(db, result, f"Agent {result.name} successfully approved.", "approve")
 
 
 @router.patch("/admin/agents/{agent_ident}/reject")
 @router.patch("/api/v1/admin/agents/{agent_ident}/reject")
-def reject_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db)):
+def reject_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db),
+                 admin: AdminIdentity = Depends(require_admin)):
     body = body or {}
     reason = body.get("rejection_reason")
     if not isinstance(reason, str) or not reason.strip():
         return error(400, "REJECTION_REASON_REQUIRED",
                      "A detailed rejection reason is mandatory when declining an agent application.")
-    result = _review(db, agent_ident, action="reject", new_status="rejected", body=body, reason=reason.strip())
+    result = _review(db, agent_ident, action="reject", new_status="rejected",
+                     reviewer=_reviewer(admin, body), reason=reason.strip())
     if isinstance(result, JSONResponse):
         return result
-    return {"success": True, "message": f"Agent application for {result.name} has been rejected.", "agent": serialize_agent(db, result)}
+    return _respond(db, result, f"Agent application for {result.name} has been rejected.", "reject", reason.strip())
 
 
 @router.patch("/admin/agents/{agent_ident}/suspend")
 @router.patch("/api/v1/admin/agents/{agent_ident}/suspend")
-def suspend_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db)):
+def suspend_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db),
+                  admin: AdminIdentity = Depends(require_admin)):
     body = body or {}
     reason = (body.get("reason") or "Operational review hold").strip() or "Operational review hold"
-    result = _review(db, agent_ident, action="suspend", new_status="suspended", body=body, reason=reason)
+    result = _review(db, agent_ident, action="suspend", new_status="suspended",
+                     reviewer=_reviewer(admin, body), reason=reason)
     if isinstance(result, JSONResponse):
         return result
-    return {"success": True, "message": f"Agent {result.name} has been suspended.", "agent": serialize_agent(db, result)}
+    return _respond(db, result, f"Agent {result.name} has been suspended.", "suspend", reason)
 
 
 @router.patch("/admin/agents/{agent_ident}/reinstate")
 @router.patch("/api/v1/admin/agents/{agent_ident}/reinstate")
-def reinstate_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db)):
+def reinstate_agent(agent_ident: str, body: Optional[dict] = None, db: Session = Depends(get_db),
+                    admin: AdminIdentity = Depends(require_admin)):
     body = body or {}
-    result = _review(db, agent_ident, action="reinstate", new_status="approved", body=body, clear_reason=True)
+    result = _review(db, agent_ident, action="reinstate", new_status="approved",
+                     reviewer=_reviewer(admin, body), clear_reason=True)
     if isinstance(result, JSONResponse):
         return result
-    return {"success": True, "message": f"Agent {result.name} has been reinstated.", "agent": serialize_agent(db, result)}
+    return _respond(db, result, f"Agent {result.name} has been reinstated.", "reinstate")
 
 
 # ----------------------------------------------------------------------------
@@ -520,7 +632,8 @@ def reinstate_agent(agent_ident: str, body: Optional[dict] = None, db: Session =
 # ----------------------------------------------------------------------------
 @router.get("/admin/agent-audit-logs")
 @router.get("/api/v1/admin/agent-audit-logs")
-def agent_audit_logs(agent_id: Optional[str] = None, limit: int = 500, db: Session = Depends(get_db)):
+def agent_audit_logs(agent_id: Optional[str] = None, limit: int = 500, db: Session = Depends(get_db),
+                     admin: AdminIdentity = Depends(require_admin)):
     q = db.query(AgentAuditLog)
     if agent_id:
         q = q.filter(AgentAuditLog.target_agent_id == agent_id)
