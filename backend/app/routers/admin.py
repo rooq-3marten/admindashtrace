@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from app.security import require_admin
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timezone, timedelta
@@ -7,7 +8,7 @@ from app.database import get_db
 from app.models import Farmer, PracticeLog, Batch, Agent, SyncEvent
 from app.schemas import AdminOverviewKPI, SystemStatusResponse
 
-router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
+router = APIRouter(prefix="/admin", tags=["Admin Dashboard"], dependencies=[Depends(require_admin)])
 
 def now_utc():
     return datetime.now(timezone.utc)
