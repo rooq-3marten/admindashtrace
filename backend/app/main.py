@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from sqlalchemy import inspect, text
 from app.config import settings
 from app.database import engine, Base
-from app.routers import admin, auth, batches, farmers, practice_logs, sync, documents, agent_accounts
+from app.routers import admin, admin_session, auth, batches, farmers, practice_logs, sync, documents, agent_accounts
+from app.security import ApiError, api_error_handler
 
 # Columns added after the first release. create_all() never alters existing tables,
 # so any missing column is added here (safe to run on every start).
@@ -54,6 +55,8 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+app.add_exception_handler(ApiError, api_error_handler)
+
 # Enable CORS for Next.js/React Admin Dashboard & mobile clients
 app.add_middleware(
     CORSMiddleware,
@@ -71,6 +74,7 @@ app.include_router(batches.router)
 app.include_router(documents.router)
 app.include_router(admin.router)
 app.include_router(agent_accounts.router)
+app.include_router(admin_session.router)
 app.include_router(auth.router)
 
 @app.get("/")
