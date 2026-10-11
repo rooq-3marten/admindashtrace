@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -6,6 +6,7 @@ import os, re, random, json, hashlib
 from app.database import get_db
 from app.models import Farmer, PracticeLog, Batch, Agent, SyncEvent, Document
 from app.routers.agent_accounts import norm_status
+from app.security import (AdminIdentity, ApiError, allow_agent_status_read, enforce_agent_token, require_admin)
 from app.schemas import BulkSyncRequest, BulkSyncResponse, SyncStatusResponse, SyncRecordResult
 
 router = APIRouter(tags=["Synchronization Layer"])
@@ -34,13 +35,17 @@ def is_test_record(name, agent_id) -> bool:
 
 @router.post("/sync/batch", response_model=BulkSyncResponse)
 @router.post("/api/v1/sync/upstream", response_model=BulkSyncResponse)
-def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
+def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = Depends(get_db)):
     """
     Bulk synchronization endpoint called by Android Agent App.
     Accepts offline-created records, performs idempotent insertion via client UUID,
     updates Agent's last_sync_at, and records a SyncEvent for real-time dashboard health monitoring.
     """
-    agent_id = request.agent_id or "AGENT-NG-042"
+    # With REQUIRE_AGENT_AUTH on, the caller must hold this agent's own session token.
+    token_agent = enforce_agent_token(http_request, request.agent_id)
+    agent_id = request.agent_id or token_agent
+    if not agent_id:
+        raise ApiError(400, "AGENT_ID_REQUIRED", "agent_id is required.")
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     # Only approved agents may upload field records (README: pending/rejected/suspended -> 403).
     # Agents created before the approval workflow existed have status "ACTIVE" and count as approved.
@@ -260,10 +265,11 @@ def sync_batch(request: BulkSyncRequest, db: Session = Depends(get_db)):
     )
 
 @router.get("/sync/status/{agent_id}", response_model=SyncStatusResponse)
-def get_sync_status(agent_id: str, db: Session = Depends(get_db)):
+def get_sync_status(agent_id: str, http_request: Request, db: Session = Depends(get_db)):
     """
     Returns last sync timestamp, health status, and pending queue size for the given agent.
     """
+    allow_agent_status_read(http_request, agent_id)
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:
         return SyncStatusResponse(
@@ -299,7 +305,7 @@ def _ms(dt):
     return int(dt.timestamp() * 1000)
 
 @router.get("/sync/status")
-def get_global_sync_status(db: Session = Depends(get_db)):
+def get_global_sync_status(db: Session = Depends(get_db), admin: AdminIdentity = Depends(require_admin)):
     """Global sync status polled by the admin dashboard."""
     from sqlalchemy import func
     last = db.query(SyncEvent).order_by(SyncEvent.created_at.desc()).first()
