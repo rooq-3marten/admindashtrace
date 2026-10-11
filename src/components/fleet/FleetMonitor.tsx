@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { useData } from '../../context/DataContext';
+import { apiFetch } from '../../lib/apiFetch';
 import {
   Radio,
   Smartphone,
@@ -77,7 +78,7 @@ export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) =
   const handleFetchDownstream = async () => {
     setIsLoadingDownstream(true);
     try {
-      const res = await fetch('/api/v1/sync/downstream?agent_id=AGENT-NG-042');
+      const res = await apiFetch('/api/v1/sync/downstream?agent_id=AGENT-NG-042');
       if (res.ok) {
         const data = await res.json();
         setDownstreamData(data);

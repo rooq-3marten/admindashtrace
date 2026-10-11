@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
+import { apiFetch } from '../../lib/apiFetch';
 import {
   Clock,
   AlertTriangle,
@@ -59,7 +60,7 @@ export const DocumentExpirySentinelView: React.FC = () => {
   const handleTriggerCronNow = async () => {
     setIsRunningCron(true);
     try {
-      fetch('/api/v1/sentinel/cron-trigger', {
+      apiFetch('/api/v1/sentinel/cron-trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ triggered_by: 'web_admin', cron_expression: cronExpression }),

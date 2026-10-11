@@ -33,6 +33,7 @@ import {
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { RegisteredAgent, AgentStatus } from '../../types';
+import { apiFetch } from '../../lib/apiFetch';
 
 export const PendingAgentsView: React.FC = () => {
   const {
@@ -187,25 +188,78 @@ export const PendingAgentsView: React.FC = () => {
 
     setIsSubmittingAction(true);
     setActionErrorMessage(null);
-    const reviewerName = userProfile?.displayName || userProfile?.email || 'Compliance Directorate';
 
     try {
       if (actionType === 'approve') {
-        await approveAgent(selectedAgent.id, reviewerName);
-        setActionSuccessMessage(`Agent ${selectedAgent.full_name} has been approved. Activation notification email sent.`);
+        const res = await apiFetch(`/api/v1/admin/agents/${encodeURIComponent(selectedAgent.id)}/approve`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.message || `The server could not approve this agent (HTTP ${res.status}).`);
+        }
+
+        const emailStatus = data?.notification?.email;
+        const recipient = data?.notification?.recipient;
+        let emailMsg = '';
+        if (emailStatus === 'sent') {
+          if (recipient && typeof recipient === 'string' && recipient.includes('@')) {
+            emailMsg = `Email sent to ${recipient}.`;
+          } else {
+            emailMsg = 'Approval saved and the email service accepted the notification.';
+          }
+        } else if (emailStatus === 'failed') {
+          emailMsg = 'Saved, but the email could not be sent. Contact the agent directly.';
+        } else if (emailStatus === 'not_configured') {
+          emailMsg = 'Saved. Email notifications are not set up yet.';
+        } else if (emailStatus === 'no_recipient') {
+          emailMsg = 'Saved, but no recipient email address is available.';
+        } else {
+          emailMsg = 'Approval saved, but email status could not be confirmed.';
+        }
+
+        const reviewerInfo = data?.agent?.reviewed_by ? ` (Reviewed by ${data.agent.reviewed_by})` : '';
+        setActionSuccessMessage(`${emailMsg}${reviewerInfo}`);
       } else if (actionType === 'reject') {
-        await rejectAgent(selectedAgent.id, actionReason, reviewerName);
-        setActionSuccessMessage(`Agent application rejected. Official reason notification sent to ${selectedAgent.email}.`);
+        const res = await apiFetch(`/api/v1/admin/agents/${encodeURIComponent(selectedAgent.id)}/reject`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rejection_reason: actionReason.trim() }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.message || `The server could not reject this agent (HTTP ${res.status}).`);
+        }
+        setActionSuccessMessage(`Agent application rejected. Reason recorded.`);
       } else if (actionType === 'suspend') {
-        await suspendAgent(selectedAgent.id, actionReason || 'Operational audit hold', reviewerName);
+        const res = await apiFetch(`/api/v1/admin/agents/${encodeURIComponent(selectedAgent.id)}/suspend`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: actionReason.trim() || 'Operational audit hold' }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.message || `The server could not suspend this agent (HTTP ${res.status}).`);
+        }
         setActionSuccessMessage(`Agent account suspended. Field data access has been revoked.`);
       } else if (actionType === 'reinstate') {
-        await reinstateAgent(selectedAgent.id, reviewerName);
+        const res = await apiFetch(`/api/v1/admin/agents/${encodeURIComponent(selectedAgent.id)}/reinstate`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.message || `The server could not reinstate this agent (HTTP ${res.status}).`);
+        }
         setActionSuccessMessage(`Agent ${selectedAgent.full_name} has been reinstated and activated.`);
       }
 
-      // Update local selected agent
+      // Update local selected agent and audit log
       await fetchRegisteredAgents();
+      await fetchAgentAuditLogs(selectedAgent.id);
       const updated = registeredAgents.find((a) => a.id === selectedAgent.id);
       if (updated) setSelectedAgent(updated);
 
@@ -810,7 +864,9 @@ export const PendingAgentsView: React.FC = () => {
                         "{selectedAgent.rejection_reason || 'Documentation did not meet verification criteria.'}"
                       </p>
                       <div className="text-[11px] text-[#A63A2E] mt-2">
-                        Reviewed by: <strong>{selectedAgent.reviewed_by || 'Compliance Desk'}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}
+                        {selectedAgent.reviewed_by
+                          ? <>Reviewed by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}</>
+                          : (selectedAgent.reviewed_at ? `Actioned on ${new Date(selectedAgent.reviewed_at).toUTCString()}` : null)}
                       </div>
                     </div>
                   )}
@@ -825,7 +881,9 @@ export const PendingAgentsView: React.FC = () => {
                         "{selectedAgent.rejection_reason || 'Temporary compliance hold.'}"
                       </p>
                       <div className="text-[11px] text-[#3A5A7A] mt-2">
-                        Actioned by: <strong>{selectedAgent.reviewed_by || 'Compliance Desk'}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}
+                        {selectedAgent.reviewed_by
+                          ? <>Actioned by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}</>
+                          : (selectedAgent.reviewed_at ? `Actioned on ${new Date(selectedAgent.reviewed_at).toUTCString()}` : null)}
                       </div>
                     </div>
                   )}
@@ -840,7 +898,9 @@ export const PendingAgentsView: React.FC = () => {
                         This agent is actively authorized to synchronize smallholder farmers and log chemical applications.
                       </p>
                       <div className="text-[11px] text-[#1A4D2E] mt-2">
-                        Approved by: <strong>{selectedAgent.reviewed_by || 'Chief Compliance Director'}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}
+                        {selectedAgent.reviewed_by
+                          ? <>Approved by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}</>
+                          : (selectedAgent.reviewed_at ? `Approved on ${new Date(selectedAgent.reviewed_at).toUTCString()}` : null)}
                       </div>
                     </div>
                   )}

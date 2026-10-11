@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useData } from '../../context/DataContext';
 import { AgentBatchSyncRequest, AgentBatchSyncResponse, DocumentCategory } from '../../types';
 import { computeSha256 } from '../../utils/crypto';
+import { apiFetch } from '../../lib/apiFetch';
 import {
   Smartphone,
   Send,
@@ -96,7 +97,7 @@ export const MobileSyncSimulator: React.FC<MobileSyncSimulatorProps> = ({
     const start = performance.now();
     try {
       const clientEpoch = Date.now();
-      const res = await fetch('/api/v1/sync/ping', { cache: 'no-store' });
+      const res = await apiFetch('/api/v1/sync/ping', { cache: 'no-store' });
       const elapsed = Math.round(performance.now() - start);
 
       if (res.ok) {

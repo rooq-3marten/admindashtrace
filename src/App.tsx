@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ShieldCheck } from '@phosphor-icons/react';
 import { DataProvider } from './context/DataContext';
 import { Header } from './components/layout/Header';
 import { Sidebar, TabType } from './components/layout/Sidebar';
@@ -254,7 +255,7 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
 }
 
 function RootRouter() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isNotAnAdmin, signOut } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const segments = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/');
@@ -312,6 +313,31 @@ function RootRouter() {
         </div>
         <h2 className="font-serif font-bold text-xl text-[#1A2E23]">TraceHarvest</h2>
         <p className="text-xs text-[#5A6B60] mt-1.5 font-mono">Verifying administrative security session…</p>
+      </div>
+    );
+  }
+
+  // Unauthorized Administrator screen (HTTP 403 NOT_AN_ADMIN)
+  if (isNotAnAdmin) {
+    return (
+      <div className="min-h-screen bg-[#FBFCFB] dark:bg-[#0E1B13] flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-white dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#243B2C] rounded-2xl p-8 shadow-sm">
+          <div className="w-14 h-14 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto mb-4">
+            <ShieldCheck size={28} weight="bold" />
+          </div>
+          <h1 className="text-xl font-bold font-serif text-[#1A2E23] dark:text-[#E8F0EA] mb-2">
+            Access Restricted
+          </h1>
+          <p className="text-sm text-[#5A6B60] dark:text-[#A1B2A7] mb-6">
+            This account is not authorized as an administrator.
+          </p>
+          <button
+            onClick={() => signOut()}
+            className="w-full py-2.5 px-4 rounded-lg bg-[#1A4D2E] hover:bg-[#143D24] text-white text-sm font-semibold transition cursor-pointer"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     );
   }

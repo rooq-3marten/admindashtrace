@@ -419,40 +419,17 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="absolute right-0 mt-2 w-64 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-xl z-50 p-3 space-y-2 animate-in fade-in duration-150">
                 <div className="pb-2 border-b border-[#E5EBE7] dark:border-[#2D4536]">
                   <p className="font-semibold text-sm text-[#1A2E23] dark:text-white truncate">
-                    {userProfile?.displayName || 'Shekoni Farooq (Super Admin)'}
+                    {userProfile?.displayName || userProfile?.email || 'Administrator'}
                   </p>
                   <p className="text-xs text-[#5A6B60] dark:text-[#8A968E] truncate">
-                    {userProfile?.email || 'shekonifarooq@gmail.com'}
+                    {userProfile?.email || ''}
                   </p>
                   <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-mono font-semibold rounded bg-[#EEF5F1] text-[#1A4D2E] dark:bg-[#20362A] dark:text-[#86EFAC]">
-                    {(role || 'super_admin').toUpperCase()}
+                    {(userProfile?.role || role || 'admin').toUpperCase()}
                   </span>
                 </div>
 
-                {/* Role Switcher */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-semibold text-[#8A968E] uppercase">
-                    Switch Active Role
-                  </span>
-                  {(['super_admin', 'compliance_officer', 'fleet_manager', 'inspector'] as UserRole[]).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => {
-                        switchRole(r);
-                        setIsUserMenuOpen(false);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition cursor-pointer ${
-                        role === r
-                          ? 'bg-[#EEF5F1] text-[#1A4D2E] dark:bg-[#20362A] dark:text-[#86EFAC] font-semibold'
-                          : 'text-[#1A2E23] dark:text-[#E8F0EA] hover:bg-[#F7F9F7] dark:hover:bg-[#14261C]'
-                      }`}
-                    >
-                      {r.replace('_', ' ').toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="pt-2 border-t border-[#E5EBE7] dark:border-[#2D4536] space-y-1">
+                <div className="pt-1 space-y-1">
                   {import.meta.env.VITE_ENABLE_SIMULATOR === 'true' && (
                     <button
                       onClick={() => {

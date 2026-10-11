@@ -145,28 +145,27 @@ export const RbacManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Role Emulation / Switcher Cards */}
+      {/* System Role Definitions Cards */}
       <div className="space-y-3">
         <h3 className="text-base font-bold text-[#111827] dark:text-white flex items-center gap-2">
           <Key className="w-4 h-4 text-[#1B7F4B] dark:text-emerald-400" />
-          Interactive Role Switcher (Test As Any Role)
+          System Role Definitions & Clearances
         </h3>
         <p className="text-xs text-[#6B7280] dark:text-slate-400">
-          Switch roles instantly to experience how permissions adapt across the application interface:
+          Administrative roles and permissions are authoritative and strictly enforced by the backend API. Client-side role modification is disabled.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {roles.map((r) => {
-            const isSelected = role === r.id;
+            const isSelected = role === r.id || (role === 'admin' && r.id === 'super_admin');
 
             return (
               <div
                 key={r.id}
-                onClick={() => switchRole(r.id)}
-                className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                className={`p-4 rounded-xl border flex flex-col justify-between ${
                   isSelected
                     ? 'bg-emerald-50/60 dark:bg-slate-900 border-[#1B7F4B] dark:border-emerald-500 shadow-sm ring-1 ring-[#1B7F4B] dark:ring-emerald-500'
-                    : 'bg-white dark:bg-slate-950/60 border-[#E5E7EB] dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-700'
+                    : 'bg-white dark:bg-slate-950/60 border-[#E5E7EB] dark:border-slate-800'
                 }`}
               >
                 <div>
@@ -181,10 +180,10 @@ export const RbacManagement: React.FC = () => {
 
                 <div className="mt-3 pt-2 border-t border-[#E5E7EB] dark:border-slate-800/80 flex items-center justify-between text-xs">
                   <span className="text-[11px] font-mono text-[#6B7280] dark:text-slate-500">
-                    {isSelected ? '✓ CURRENTLY ACTIVE' : 'CLICK TO EMULATE'}
+                    {isSelected ? '✓ CURRENT ADMINISTRATIVE CLEARANCE' : 'ROLE DEFINITION'}
                   </span>
                   <span className={`text-[11px] font-semibold ${isSelected ? 'text-[#1B7F4B] dark:text-emerald-400' : 'text-[#6B7280] dark:text-slate-400'}`}>
-                    {isSelected ? 'Active' : 'Select'}
+                    {isSelected ? 'Active' : 'Standard'}
                   </span>
                 </div>
               </div>
