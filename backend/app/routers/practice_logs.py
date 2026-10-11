@@ -1,19 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 from app.database import get_db
+from app.routers.agent_accounts import agent_write_gate
+from app.security import require_admin
 from app.models import PracticeLog, Farmer, Agent
 from app.schemas import PracticeLogCreate, PracticeLogOut
 
 router = APIRouter(tags=["Practice Logs"])
 
 @router.post("/practice-logs", response_model=PracticeLogOut)
-def create_practice_log(payload: PracticeLogCreate, db: Session = Depends(get_db)):
+def create_practice_log(payload: PracticeLogCreate, http_request: Request, db: Session = Depends(get_db)):
     """
     Direct practice log creation called by Agent App.
+    The agent must be registered and approved, the same as for syncing.
     """
+    agent_id = agent_write_gate(http_request, db, payload.agent_id)
     log_id = payload.id or payload.client_uuid or str(uuid.uuid4())
     existing = db.query(PracticeLog).filter(PracticeLog.id == log_id).first()
     if existing:
@@ -42,14 +46,14 @@ def create_practice_log(payload: PracticeLogCreate, db: Session = Depends(get_db
         quantity = payload.quantity_used or payload.quantity or 1.0,
         log_date = log_date,
         source = payload.source or "agent",
-        agent_id = payload.agent_id or "AGENT-NG-042",
+        agent_id = agent_id,
         created_at = datetime.now(timezone.utc),
         synced_at = datetime.now(timezone.utc)
     )
     db.add(practice)
 
-    if payload.agent_id:
-        agent = db.query(Agent).filter(Agent.id == payload.agent_id).first()
+    if agent_id:
+        agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if agent:
             agent.last_sync_at = datetime.now(timezone.utc)
 
@@ -57,7 +61,7 @@ def create_practice_log(payload: PracticeLogCreate, db: Session = Depends(get_db
     db.refresh(practice)
     return practice
 
-@router.get("/practice-logs", response_model=List[PracticeLogOut])
+@router.get("/practice-logs", response_model=List[PracticeLogOut], dependencies=[Depends(require_admin)])
 def list_practice_logs(
     farmer_id: Optional[str] = None,
     limit: int = 100,
