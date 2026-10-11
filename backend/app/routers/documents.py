@@ -1,3 +1,4 @@
+from app.security import require_admin
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -7,7 +8,7 @@ from app.database import get_db
 from app.models import Document
 from app.schemas import DocumentCreate, DocumentOut, DocumentVerify
 
-router = APIRouter(prefix="/documents", tags=["Regulatory & Compliance Documents"])
+router = APIRouter(prefix="/documents", tags=["Regulatory & Compliance Documents"], dependencies=[Depends(require_admin)])
 
 def now_utc():
     return datetime.now(timezone.utc)
