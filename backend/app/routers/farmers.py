@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid, random
@@ -6,14 +6,21 @@ from datetime import datetime, timezone
 from app.database import get_db
 from app.models import Farmer, Agent
 from app.schemas import FarmerCreate, FarmerOut
+from app.routers.agent_accounts import agent_write_gate
+from app.routers.sync import is_test_record
+from app.security import ApiError, AdminIdentity, require_admin
 
 router = APIRouter(tags=["Farmers"])
 
 @router.post("/farmers", response_model=FarmerOut)
-def create_farmer(payload: FarmerCreate, db: Session = Depends(get_db)):
+def create_farmer(payload: FarmerCreate, http_request: Request, db: Session = Depends(get_db)):
     """
     Direct farmer enrollment endpoint called by Agent App.
+    The agent must be registered and approved, the same as for syncing.
     """
+    agent_id = agent_write_gate(http_request, db, payload.agent_id)
+    if is_test_record(payload.full_name or payload.name, agent_id):
+        raise ApiError(422, "TEST_DATA_REJECTED", "Test data is not accepted by this server.")
     farmer_id = payload.id or payload.client_uuid or str(uuid.uuid4())
     
     # Check if already exists
@@ -34,7 +41,7 @@ def create_farmer(payload: FarmerCreate, db: Session = Depends(get_db)):
         gps_lng = payload.longitude or payload.gps_lng,
         crop_type = payload.crop or payload.crop_type or "Sesame",
         cooperative = payload.cooperative_name or payload.cooperative,
-        enrolled_by_agent_id = payload.agent_id or "AGENT-NG-042",
+        enrolled_by_agent_id = agent_id,
         source = payload.source or "agent",
         created_at = datetime.now(timezone.utc),
         synced_at = datetime.now(timezone.utc)
@@ -42,16 +49,15 @@ def create_farmer(payload: FarmerCreate, db: Session = Depends(get_db)):
     db.add(farmer)
 
     # Touch agent sync
-    if payload.agent_id:
-        agent = db.query(Agent).filter(Agent.id == payload.agent_id).first()
-        if agent:
-            agent.last_sync_at = datetime.now(timezone.utc)
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if agent:
+        agent.last_sync_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(farmer)
     return farmer
 
-@router.get("/farmers", response_model=List[FarmerOut])
+@router.get("/farmers", response_model=List[FarmerOut], dependencies=[Depends(require_admin)])
 def list_farmers(
     crop: Optional[str] = None,
     agent_id: Optional[str] = None,
