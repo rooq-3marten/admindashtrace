@@ -1,19 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid, random
 from datetime import datetime, timezone
 from app.database import get_db
+from app.routers.agent_accounts import agent_write_gate
+from app.security import require_admin
 from app.models import Batch, Farmer, Agent
 from app.schemas import BatchCreate, BatchOut
 
 router = APIRouter(tags=["Batches"])
 
 @router.post("/batches", response_model=BatchOut)
-def create_batch(payload: BatchCreate, db: Session = Depends(get_db)):
+def create_batch(payload: BatchCreate, http_request: Request, db: Session = Depends(get_db)):
     """
     Direct batch creation called by Agent App.
+    The agent must be registered and approved, the same as for syncing.
     """
+    agent_id = agent_write_gate(http_request, db, payload.agent_id)
     batch_id = payload.id or payload.client_uuid or str(uuid.uuid4())
     existing = db.query(Batch).filter(Batch.id == batch_id).first()
     if existing:
@@ -24,7 +28,7 @@ def create_batch(payload: BatchCreate, db: Session = Depends(get_db)):
     batch = Batch(
         id = batch_id,
         batch_code = batch_code,
-        agent_id = payload.agent_id or "AGENT-NG-042",
+        agent_id = agent_id,
         total_quantity = payload.total_quantity,
         quality_grade = payload.quality_grade,
         aggregation_gps_lat = payload.aggregation_gps_lat,
@@ -47,8 +51,8 @@ def create_batch(payload: BatchCreate, db: Session = Depends(get_db)):
 
     db.add(batch)
 
-    if payload.agent_id:
-        agent = db.query(Agent).filter(Agent.id == payload.agent_id).first()
+    if agent_id:
+        agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if agent:
             agent.last_sync_at = datetime.now(timezone.utc)
 
@@ -56,6 +60,6 @@ def create_batch(payload: BatchCreate, db: Session = Depends(get_db)):
     db.refresh(batch)
     return batch
 
-@router.get("/batches", response_model=List[BatchOut])
+@router.get("/batches", response_model=List[BatchOut], dependencies=[Depends(require_admin)])
 def list_batches(limit: int = 100, offset: int = 0, db: Session = Depends(get_db)):
     return db.query(Batch).order_by(Batch.created_at.desc()).offset(offset).limit(limit).all()
