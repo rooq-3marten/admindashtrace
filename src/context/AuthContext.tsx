@@ -135,12 +135,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const res = await apiFetch('/api/v1/admin/me');
           if (res.status === 200) {
             const adminData = await res.json();
+            const allowedRoles: UserRole[] = [
+              'super_admin',
+              'compliance_officer',
+              'fleet_manager',
+              'inspector',
+              'admin',
+            ];
+            if (!adminData?.role || !allowedRoles.includes(adminData.role as UserRole)) {
+              throw new Error('The backend did not return a verified administrator role.');
+            }
             const profile: UserProfile = {
               uid: firebaseUser.uid,
               email: adminData.email || firebaseUser.email || '',
               displayName: adminData.name || firebaseUser.displayName || adminData.email || 'Administrator',
               photoURL: firebaseUser.photoURL || undefined,
-              role: (adminData.role as UserRole) || 'super_admin',
+              role: adminData.role as UserRole,
               agency: 'TraceHarvest Control Center',
               updatedAt: new Date().toISOString(),
             };
