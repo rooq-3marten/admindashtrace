@@ -201,7 +201,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
       console.warn('Google sign-in error:', err);
+      setAuthErrorMessage(
+        err instanceof Error ? err.message : 'Google sign-in could not be completed.'
+      );
       setIsLoading(false);
+      throw err;
     }
   };
 
