@@ -164,45 +164,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await signOut();
             setAuthErrorMessage('Session expired, please sign in again.');
           } else {
-            // Server error or unexpected status - do not treat as unauthorized
-            console.warn(`[Auth] /admin/me returned HTTP ${res.status}. Preserving session.`);
-            const fallbackProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || firebaseUser.email || 'Administrator',
-              photoURL: firebaseUser.photoURL || undefined,
-              role: 'super_admin',
-              agency: 'TraceHarvest Control Center',
-              updatedAt: new Date().toISOString(),
-            };
-            setUserProfile(fallbackProfile);
-            setIsAuthenticated(true);
-            setIsNotAnAdmin(false);
+            // Fail closed: a server error is not proof of administrator authorization.
+            setUserProfile(null);
+            setIsAuthenticated(false);
+            setAuthErrorMessage(
+              `Unable to verify administrator access (HTTP ${res.status}). Please try again shortly.`
+            );
           }
         } catch (netErr) {
-          // Network errors: do not treat network errors as unauthorized
-          console.warn('[Auth] Network error reaching /admin/me:', netErr);
-          const fallbackProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || firebaseUser.email || 'Administrator',
-            photoURL: firebaseUser.photoURL || undefined,
-            role: 'super_admin',
-            agency: 'TraceHarvest Control Center',
-            updatedAt: new Date().toISOString(),
-          };
-          setUserProfile(fallbackProfile);
-          setIsAuthenticated(true);
-          setIsNotAnAdmin(false);
+          // Fail closed when the backend cannot verify the Firebase identity.
+          console.warn('[Auth] Unable to verify administrator access:', netErr);
+          setUserProfile(null);
+          setIsAuthenticated(false);
+          setAuthErrorMessage('Unable to verify administrator access. Check your connection and try again.');
+
         }
       } else {
         setCurrentUser(null);
-        // If not authenticated in Firebase, check local session persistence
-        const rawSession = localStorage.getItem('th_auth_session');
-        if (!rawSession) {
-          setIsAuthenticated(false);
-          setUserProfile(null);
-        }
+        // Firebase is the source of truth. A cached browser session is not authentication.
+        clearSession();
+        setIsAuthenticated(false);
+        setUserProfile(null);
+        setIsNotAnAdmin(false);
       }
       setIsLoading(false);
     });
