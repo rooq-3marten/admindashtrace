@@ -70,8 +70,8 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     }
   }
 
-  // Attach token if present and not already specified
-  if (token && !headers.has('Authorization')) {
+  // Always prefer the freshly issued Firebase token over any stale caller-supplied header.
+  if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
