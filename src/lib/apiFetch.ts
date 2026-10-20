@@ -46,8 +46,16 @@ function isProtectedEndpoint(url: string): boolean {
     url.includes('/api/v1/admin') ||
     url.includes('/api/v1/documents') ||
     url.includes('/documents') ||
-    url.includes('/api/v1/sentinel')
+    url.includes('/api/v1/sentinel') ||
+    url.includes('/api/v1/sync/status')
   );
+}
+
+function localResponse(status: number, error: string, message: string): Response {
+  return new Response(JSON.stringify({ error, message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 /**
@@ -59,7 +67,15 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   const urlStr = typeof input === 'string' ? input : input.toString();
   const headers = new Headers(init?.headers);
 
-  // Retrieve fresh Firebase ID token if user is signed in
+  // Firebase restores a saved sign-in asynchronously. Wait for it, otherwise a page refresh
+  // looks like "nobody is signed in" for a moment and would wrongly end the session.
+  try {
+    await auth.authStateReady();
+  } catch {
+    // fall through: currentUser below decides
+  }
+
+  // A fresh token for every call (Firebase refreshes it automatically when it is near expiry)
   const currentUser = auth.currentUser;
   let token: string | null = null;
   if (currentUser) {
@@ -75,18 +91,14 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // If a protected endpoint is called without a token, do not silently send an unauthenticated request.
-  // Handle missing authentication safely and consistently with the existing sign-in flow.
   if (!token && isProtectedEndpoint(urlStr)) {
-    triggerAuthError('session_expired', 'Session expired, please sign in again.');
-    return new Response(
-      JSON.stringify({ error: 'UNAUTHENTICATED', message: 'Sign in to continue.' }),
-      {
-        status: 401,
-        statusText: 'Unauthorized',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    // Never send a protected request without credentials.
+    if (currentUser) {
+      // Signed in, but a token could not be obtained (usually a network problem): not a logout.
+      return localResponse(503, 'AUTH_UNAVAILABLE', 'Could not refresh your sign-in. Check your connection.');
+    }
+    // Nobody is signed in, so there is no session to expire: answer locally and stay quiet.
+    return localResponse(401, 'UNAUTHENTICATED', 'Sign in to continue.');
   }
 
   const response = await fetch(input, {
