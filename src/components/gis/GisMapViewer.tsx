@@ -321,11 +321,10 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({ onSelectFarmer }) =>
 
   const [showSatellitePolygons, setShowSatellitePolygons] = useState<boolean>(true);
   const [showCentroidMarkers, setShowCentroidMarkers] = useState<boolean>(true);
-  const [mapEngine, setMapEngine] = useState<'google' | 'fallback'>('google');
-
-  // API Key provisioning with reliable fallback to provisioned demo key
-  const apiKey =
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyDUVr3YbwYrnDqCfoeddvPTOrFl6gPjngc';
+  // The Maps key comes from the environment only (set VITE_GOOGLE_MAPS_API_KEY in Vercel).
+  // Without a key the built-in offline map is used instead of Google imagery.
+  const apiKey: string = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const [mapEngine, setMapEngine] = useState<'google' | 'fallback'>(apiKey ? 'google' : 'fallback');
 
   // Synchronize selected farmer when safeFarmers changes
   useEffect(() => {
