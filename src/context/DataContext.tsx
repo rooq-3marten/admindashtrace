@@ -33,6 +33,8 @@ import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, setDoc, doc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { computeSha256 } from '../utils/crypto';
+import { apiFetch } from '../lib/apiFetch';
+import { useAuth } from './AuthContext';
 
 interface DataContextType {
   farmers: Farmer[];
@@ -114,6 +116,7 @@ function safeLoadStorage<T>(key: string, fallback: T, filterEntities = false): T
 }
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [farmers, setFarmers] = useState<Farmer[]>(() => {
     return safeLoadStorage<Farmer[]>('th2_farmers', INITIAL_FARMERS, true);
   });
@@ -187,7 +190,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let strengthPayload: any = null;
 
     try {
-      const res = await fetch('/api/v1/sync/strength-check', { cache: 'no-store' });
+      const res = await apiFetch('/api/v1/sync/strength-check', { cache: 'no-store' });
       gatewayStatus = res.status;
       if (res.ok) {
         gatewayOk = true;
@@ -205,7 +208,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let downstreamStatus = 0;
     let downstreamRecords = 0;
     try {
-      const res = await fetch('/api/v1/sync/downstream?since_epoch_ms=0', { cache: 'no-store' });
+      const res = await apiFetch('/api/v1/sync/downstream?since_epoch_ms=0', { cache: 'no-store' });
       downstreamStatus = res.status;
       if (res.ok) {
         downstreamOk = true;
@@ -335,11 +338,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (!isSilent) setIsSyncing(true);
       const [resStatus, resFarmers, resPractices, resAgents, resDocs] = await Promise.all([
-        fetch('/api/v1/sync/status').catch(() => null),
-        fetch('/api/v1/admin/farmers').catch(() => null),
-        fetch('/api/v1/admin/practices').catch(() => null),
-        fetch('/api/v1/admin/agents').catch(() => null),
-        fetch('/api/v1/documents').catch(() => null),
+        apiFetch('/api/v1/sync/status').catch(() => null),
+        apiFetch('/api/v1/admin/farmers').catch(() => null),
+        apiFetch('/api/v1/admin/practices').catch(() => null),
+        apiFetch('/api/v1/admin/agents').catch(() => null),
+        apiFetch('/api/v1/documents').catch(() => null),
       ]);
 
       if (resStatus && resStatus.ok) {
@@ -377,7 +380,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Also sync registered agents & review status
       try {
-        const regRes = await fetch('/api/v1/admin/registered-agents?status=all&limit=100');
+        const regRes = await apiFetch('/api/v1/admin/registered-agents?status=all&limit=100');
         if (regRes.ok) {
           const regData = await regRes.json();
           if (regData.agents && Array.isArray(regData.agents)) {
@@ -388,7 +391,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Also sync audit logs
       try {
-        const auditRes = await fetch('/api/v1/admin/agent-audit-logs');
+        const auditRes = await apiFetch('/api/v1/admin/agent-audit-logs');
         if (auditRes.ok) {
           const auditData = await auditRes.json();
           if (Array.isArray(auditData)) {
@@ -406,6 +409,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Periodic automatic sync with mobile backend every 4 seconds & strength checks every 10 seconds
   useEffect(() => {
+    if (!isAuthenticated) return; // nobody signed in: make no backend calls at all
     syncWithMobileBackend(true);
     checkConnectionStrength();
     const syncInterval = setInterval(() => {
@@ -418,7 +422,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearInterval(syncInterval);
       clearInterval(strengthInterval);
     };
-  }, [syncWithMobileBackend, checkConnectionStrength]);
+  }, [isAuthenticated, syncWithMobileBackend, checkConnectionStrength]);
+
+  // Signing out removes farmer/agent/document data from memory and from the browser cache
+  useEffect(() => {
+    if (isAuthenticated) return;
+    setFarmers([]);
+    setPractices([]);
+    setAgents([]);
+    setDocuments([]);
+    setRegisteredAgents([]);
+    setAgentAuditLogs([]);
+  }, [isAuthenticated]);
 
   // Keep localStorage updated
   useEffect(() => {
@@ -628,7 +643,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // 6. Notify Express backend API asynchronously
       try {
-        await fetch('/api/v1/sync/upstream', {
+        await apiFetch('/api/v1/sync/upstream', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -780,7 +795,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Regulatory & Compliance Documents Operations
   const refreshDocuments = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/documents');
+      const res = await apiFetch('/api/v1/documents');
       if (res.ok) {
         const data = await res.json();
         const serverDocs = data.documents || data;
@@ -795,7 +810,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const uploadDocument = useCallback(async (docData: Partial<RegulatoryDocument>): Promise<RegulatoryDocument> => {
     try {
-      const res = await fetch('/api/v1/documents/upload', {
+      const res = await apiFetch('/api/v1/documents/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(docData),
@@ -844,7 +859,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const verifyDocument = useCallback(async (docId: string, status: DocumentStatus, notes?: string, verifiedBy?: string) => {
     try {
-      await fetch(`/api/v1/documents/${docId}/verify`, {
+      await apiFetch(`/api/v1/documents/${docId}/verify`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -873,7 +888,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const deleteDocument = useCallback(async (docId: string) => {
     try {
-      await fetch(`/api/v1/documents/${docId}`, { method: 'DELETE' });
+      await apiFetch(`/api/v1/documents/${docId}`, { method: 'DELETE' });
     } catch (e) {
       console.warn('Backend document delete failed:', e);
     }
@@ -883,7 +898,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Field Agent Review Actions
   const fetchRegisteredAgents = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/admin/registered-agents?status=all&limit=100');
+      const res = await apiFetch('/api/v1/admin/registered-agents?status=all&limit=100');
       if (res.ok) {
         const data = await res.json();
         if (data.agents && Array.isArray(data.agents)) {
@@ -898,7 +913,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchAgentAuditLogs = useCallback(async (agentId?: string): Promise<AgentAuditLog[]> => {
     try {
       const url = agentId ? `/api/v1/admin/agent-audit-logs?agent_id=${encodeURIComponent(agentId)}` : '/api/v1/admin/agent-audit-logs';
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const logs = await res.json();
         if (Array.isArray(logs)) {
@@ -918,7 +933,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     async (agentId: string, action: 'approve' | 'reject' | 'suspend' | 'reinstate', body: Record<string, unknown>) => {
       let res: Response;
       try {
-        res = await fetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/${action}`, {
+        res = await apiFetch(`/api/v1/admin/agents/${encodeURIComponent(agentId)}/${action}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -941,21 +956,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 
   const approveAgent = useCallback(
-    (agentId: string, reviewedBy = 'Dashboard admin') => runAgentAction(agentId, 'approve', { reviewed_by: reviewedBy }),
+    (agentId: string, _reviewedBy?: string) => runAgentAction(agentId, 'approve', {}),
     [runAgentAction]
   );
   const rejectAgent = useCallback(
-    (agentId: string, rejectionReason: string, reviewedBy = 'Dashboard admin') =>
-      runAgentAction(agentId, 'reject', { rejection_reason: rejectionReason, reviewed_by: reviewedBy }),
+    (agentId: string, rejectionReason: string, _reviewedBy?: string) =>
+      runAgentAction(agentId, 'reject', { rejection_reason: rejectionReason }),
     [runAgentAction]
   );
   const suspendAgent = useCallback(
-    (agentId: string, reason: string, reviewedBy = 'Dashboard admin') =>
-      runAgentAction(agentId, 'suspend', { reason, reviewed_by: reviewedBy }),
+    (agentId: string, reason: string, _reviewedBy?: string) =>
+      runAgentAction(agentId, 'suspend', { reason }),
     [runAgentAction]
   );
   const reinstateAgent = useCallback(
-    (agentId: string, reviewedBy = 'Dashboard admin') => runAgentAction(agentId, 'reinstate', { reviewed_by: reviewedBy }),
+    (agentId: string, _reviewedBy?: string) => runAgentAction(agentId, 'reinstate', {}),
     [runAgentAction]
   );
 
