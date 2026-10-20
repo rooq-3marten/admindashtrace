@@ -40,51 +40,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      const rawSession = localStorage.getItem('th_auth_session') || sessionStorage.getItem('th_auth_session');
-      if (rawSession) {
-        const session: AuthSession = JSON.parse(rawSession);
-        if (session.expiresAtMs && session.expiresAtMs > Date.now()) {
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  });
-
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    try {
-      const savedProfile = localStorage.getItem('th_user_profile');
-      if (savedProfile) {
-        return JSON.parse(savedProfile);
-      }
-    } catch (_) {}
-    return null;
-  });
-
-  const saveSession = (role: string, email: string, rememberMe = true) => {
-    const durationMs = rememberMe ? 30 * 24 * 3600 * 1000 : 8 * 3600 * 1000;
-    const session: AuthSession = {
-      token: `th_jwt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      expiresAtMs: Date.now() + durationMs,
-      rememberMe,
-      role,
-      email,
-    };
-
-    try {
-      if (rememberMe) {
-        localStorage.setItem('th_auth_session', JSON.stringify(session));
-      } else {
-        sessionStorage.setItem('th_auth_session', JSON.stringify(session));
-      }
-      document.cookie = `traceharvest_session=${session.token}; path=/; max-age=${Math.round(durationMs / 1000)}; SameSite=Strict; Secure`;
-    } catch (_) {}
-  };
+  // Signed-in state comes only from Firebase plus the server's /admin/me answer, never from browser storage.
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const clearSession = () => {
     try {
+      // Remove leftovers written by earlier versions
       localStorage.removeItem('th_auth_session');
       localStorage.removeItem('th_user_profile');
       sessionStorage.removeItem('th_auth_session');
@@ -123,6 +85,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => unregister();
   }, []);
 
+  // End a sign-in we cannot verify: sign out of Firebase and tell the person why.
+  const failClosed = async (message: string) => {
+    try {
+      await fbSignOut(auth);
+    } catch (_) {}
+    clearSession();
+    setCurrentUser(null);
+    setUserProfile(null);
+    setIsAuthenticated(false);
+    setIsNotAnAdmin(false);
+    setAuthErrorMessage(message);
+  };
+
   // Monitor Firebase Auth State & establish admin profile from /admin/me
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -140,15 +115,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               email: adminData.email || firebaseUser.email || '',
               displayName: adminData.name || firebaseUser.displayName || adminData.email || 'Administrator',
               photoURL: firebaseUser.photoURL || undefined,
-              role: (adminData.role as UserRole) || 'super_admin',
+              role: (adminData.role as UserRole) || 'admin',
               agency: 'TraceHarvest Control Center',
               updatedAt: new Date().toISOString(),
             };
             setUserProfile(profile);
             setIsAuthenticated(true);
             setIsNotAnAdmin(false);
-            saveSession(profile.role, profile.email, true);
-            localStorage.setItem('th_user_profile', JSON.stringify(profile));
           } else if (res.status === 403) {
             const errData = await res.json().catch(() => null);
             if (errData?.error === 'NOT_AN_ADMIN') {
@@ -164,45 +137,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await signOut();
             setAuthErrorMessage('Session expired, please sign in again.');
           } else {
-            // Server error or unexpected status - do not treat as unauthorized
-            console.warn(`[Auth] /admin/me returned HTTP ${res.status}. Preserving session.`);
-            const fallbackProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || firebaseUser.email || 'Administrator',
-              photoURL: firebaseUser.photoURL || undefined,
-              role: 'super_admin',
-              agency: 'TraceHarvest Control Center',
-              updatedAt: new Date().toISOString(),
-            };
-            setUserProfile(fallbackProfile);
-            setIsAuthenticated(true);
-            setIsNotAnAdmin(false);
+            // The server could not confirm this account (outage, misconfiguration). Fail closed.
+            console.warn(`[Auth] /admin/me returned HTTP ${res.status}. Signing out.`);
+            await failClosed('We could not verify your administrator account right now. Please try again in a moment.');
           }
         } catch (netErr) {
-          // Network errors: do not treat network errors as unauthorized
           console.warn('[Auth] Network error reaching /admin/me:', netErr);
-          const fallbackProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || firebaseUser.email || 'Administrator',
-            photoURL: firebaseUser.photoURL || undefined,
-            role: 'super_admin',
-            agency: 'TraceHarvest Control Center',
-            updatedAt: new Date().toISOString(),
-          };
-          setUserProfile(fallbackProfile);
-          setIsAuthenticated(true);
-          setIsNotAnAdmin(false);
+          await failClosed('We could not reach the server to verify your account. Check your connection and try again.');
         }
       } else {
+        // Not signed in to Firebase: nobody is authenticated, whatever the browser has stored
         setCurrentUser(null);
-        // If not authenticated in Firebase, check local session persistence
-        const rawSession = localStorage.getItem('th_auth_session');
-        if (!rawSession) {
-          setIsAuthenticated(false);
-          setUserProfile(null);
-        }
+        setIsAuthenticated(false);
+        setUserProfile(null);
       }
       setIsLoading(false);
     });
