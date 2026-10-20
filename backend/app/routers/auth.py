@@ -1,3 +1,5 @@
+from typing import Optional
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -5,7 +7,7 @@ from app.models import User, Agent
 from app.schemas import LoginRequest, Token
 from app.auth import verify_password, create_access_token, create_refresh_token, get_current_user
 from app.routers.agent_accounts import agent_login_core, find_agent_for_login, norm_status
-from app.security import ApiError, agent_claims
+from app.security import ApiError, agent_claims, bearer_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -37,28 +39,37 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=Token)
-def refresh_token(token_data: Token, db: Session = Depends(get_db)):
-    """Lets a field agent renew a session without re-entering their password."""
+def refresh_token(request: Request, body: Optional[dict] = None, db: Session = Depends(get_db)):
+    """
+    Renews a field agent's session without a password.
+
+    Send the REFRESH token either as  Authorization: Bearer <refresh_token>  or as JSON
+    {"refresh_token": "..."}. Access tokens are rejected here, so a stolen access token
+    cannot be renewed forever. Every refresh issues a new refresh token (30-day sliding window).
+    """
     from jose import jwt, JWTError, ExpiredSignatureError
     from app.config import settings
 
-    refresh_token_val = token_data.refresh_token or token_data.access_token
-    if not refresh_token_val:
+    supplied = (body or {}).get("refresh_token") or bearer_token(request)
+    if not supplied:
         raise ApiError(400, "VALIDATION_ERROR", "refresh_token is required.")
     try:
-        payload = jwt.decode(refresh_token_val, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(supplied, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except ExpiredSignatureError:
         raise ApiError(401, "TOKEN_EXPIRED", "Your session has expired. Please sign in again.")
     except JWTError:
         raise ApiError(401, "UNAUTHENTICATED", "Invalid session. Please sign in again.")
 
-    sub = payload.get("sub")
-    agent = db.query(Agent).filter(Agent.id == sub).first() if payload.get("role") == "agent" else None
+    if payload.get("type") != "refresh" or payload.get("role") != "agent":
+        raise ApiError(401, "UNAUTHENTICATED", "Invalid session. Please sign in again.")
+    agent = db.query(Agent).filter(Agent.id == payload.get("sub")).first()
     if not agent:
         raise ApiError(401, "UNAUTHENTICATED", "Invalid session. Please sign in again.")
 
-    new_access = create_access_token(data={"sub": agent.id, "role": "agent", "name": agent.name})
-    return Token(access_token=new_access, refresh_token=refresh_token_val, expires_in=604800)
+    new_access = create_access_token(data={"sub": agent.id, "role": "agent", "name": agent.name},
+                                     expires_delta=timedelta(days=7))
+    new_refresh = create_refresh_token(data={"sub": agent.id, "role": "agent"})
+    return Token(access_token=new_access, refresh_token=new_refresh, expires_in=604800)
 
 
 @router.get("/me")
