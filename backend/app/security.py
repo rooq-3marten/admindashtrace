@@ -205,6 +205,9 @@ def agent_claims(request: Request) -> dict:
         raise ApiError(401, "UNAUTHENTICATED", "Invalid session. Please sign in again.")
     if claims.get("role") != "agent" or not claims.get("sub"):
         raise ApiError(401, "UNAUTHENTICATED", "This session is not a field agent session.")
+    if claims.get("type") == "refresh":
+        # Refresh tokens only renew sessions (POST /auth/refresh); they are never valid for API calls.
+        raise ApiError(401, "UNAUTHENTICATED", "Invalid session. Please sign in again.")
     return claims
 
 
