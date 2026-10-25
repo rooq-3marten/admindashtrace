@@ -20,8 +20,6 @@ interface AuthContextType {
   isLoading: boolean;
   isNotAnAdmin: boolean;
   authErrorMessage: string | null;
-  loginWithCredentials: (email: string, password: string, rememberMe?: boolean) => Promise<boolean>;
-  loginDemo: (role?: UserRole) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
@@ -169,32 +167,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Demo sign-in and local credential flow (triggers Google or sets loading state)
-  const loginWithCredentials = async (email: string, pass: string, rememberMe = true): Promise<boolean> => {
-    setIsLoading(true);
-    setAuthErrorMessage(null);
-    setIsNotAnAdmin(false);
-    await new Promise((res) => setTimeout(res, 200));
-
-    if (pass.length < 4) {
-      setIsLoading(false);
-      return false;
-    }
-
-    // Try Google sign-in if email matches Google account or authenticate
-    try {
-      await signInWithGoogle();
-      return true;
-    } catch {
-      setIsLoading(false);
-      return false;
-    }
-  };
-
-  const loginDemo = async () => {
-    await signInWithGoogle();
-  };
-
   // Browser-based role switcher disabled: roles are established strictly server-side
   const switchRole = (_newRole: UserRole) => {
     console.warn('[Security] Client-side role switching is disabled. Administrator identity is verified by the backend.');
@@ -217,8 +189,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         isNotAnAdmin,
         authErrorMessage,
-        loginWithCredentials,
-        loginDemo,
         signInWithGoogle,
         signOut,
         switchRole,
