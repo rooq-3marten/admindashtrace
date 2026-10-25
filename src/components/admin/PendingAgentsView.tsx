@@ -7,7 +7,7 @@
  * verify cooperative associations, and approve, reject, suspend, or reinstate accounts.
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   UserCheck,
   UserMinus,
@@ -34,10 +34,30 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { RegisteredAgent, AgentStatus } from '../../types';
 import { apiFetch } from '../../lib/apiFetch';
+import { useModalA11y } from '../../lib/useModalA11y';
+
+const lagosFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Africa/Lagos',
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
+function formatLagos(iso: string | null | undefined): string {
+  if (!iso) return 'N/A';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? 'N/A' : `${lagosFormatter.format(d)} WAT`;
+}
+
+interface AgentSummary {
+  pending: number;
+  approved: number;
+  rejected: number;
+  suspended: number;
+  total: number;
+}
 
 export const PendingAgentsView: React.FC = () => {
   const {
-    registeredAgents,
     pendingAgentsCount,
     fetchRegisteredAgents,
     approveAgent,
@@ -49,15 +69,27 @@ export const PendingAgentsView: React.FC = () => {
   } = useData();
   const { userProfile } = useAuth();
 
-  // Search & Filter State
+  // Search & Filter State (sent to the server as query parameters)
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<AgentStatus | 'all'>('pending');
   const [selectedAssociation, setSelectedAssociation] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
 
-  // Pagination State
+  // Pagination State (the server pages the results)
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Server data for the current page
+  const [agents, setAgents] = useState<RegisteredAgent[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState<AgentSummary>({ pending: 0, approved: 0, rejected: 0, suspended: 0, total: 0 });
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [listError, setListError] = useState('');
+  const [knownAssociations, setKnownAssociations] = useState<string[]>([]);
+  const [knownLocations, setKnownLocations] = useState<string[]>([]);
+  const requestSeq = useRef(0);
 
   // Modal / Detail States
   const [selectedAgent, setSelectedAgent] = useState<RegisteredAgent | null>(null);
@@ -73,15 +105,83 @@ export const PendingAgentsView: React.FC = () => {
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch latest data on load
+  // Keyboard access for the two dialogs: focus trap, Esc to close, focus returns to the opener.
+  // The detail dialog's trap pauses while the confirmation dialog is on top of it.
+  const detailRef = useModalA11y<HTMLDivElement>(isDetailOpen && !actionType, () => setIsDetailOpen(false));
+  const actionRef = useModalA11y<HTMLDivElement>(!!actionType, () => {
+    if (!isSubmittingAction) setActionType(null);
+  });
+
+  // Wait for the user to stop typing before asking the server to search
   useEffect(() => {
-    fetchRegisteredAgents();
-  }, [fetchRegisteredAgents]);
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  // A new search always starts from the first page
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  // GET /api/v1/admin/registered-agents with the server's page, limit, status and search parameters
+  const loadAgents = useCallback(
+    async (silent = false) => {
+      const seq = ++requestSeq.current;
+      if (!silent) setListState('loading');
+      try {
+        const params = new URLSearchParams({
+          page: String(currentPage),
+          limit: String(pageSize),
+          status: selectedStatus,
+        });
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        if (selectedAssociation !== 'all') params.set('association', selectedAssociation);
+        if (selectedLocation !== 'all') params.set('location', selectedLocation);
+
+        const res = await apiFetch(`/api/v1/admin/registered-agents?${params.toString()}`);
+        const body = await res.json().catch(() => null);
+        if (seq !== requestSeq.current) return; // a newer request superseded this one
+        if (!res.ok || !body || !Array.isArray(body.agents)) {
+          throw new Error(body?.message || `The server could not return the agent list (HTTP ${res.status}).`);
+        }
+
+        const rows = body.agents as RegisteredAgent[];
+        setAgents(rows);
+        setServerTotal(typeof body.total === 'number' ? body.total : rows.length);
+        const pages = typeof body.total_pages === 'number' && body.total_pages > 0 ? body.total_pages : 1;
+        setTotalPages(pages);
+        if (currentPage > pages) setCurrentPage(pages);
+        if (body.summary) {
+          setSummary({
+            pending: body.summary.pendingCount ?? 0,
+            approved: body.summary.approvedCount ?? 0,
+            rejected: body.summary.rejectedCount ?? 0,
+            suspended: body.summary.suspendedCount ?? 0,
+            total: body.summary.totalCount ?? 0,
+          });
+        }
+        setKnownAssociations((prev) => Array.from(new Set([...prev, ...rows.map((r) => r.association).filter(Boolean)])).sort());
+        setKnownLocations((prev) => Array.from(new Set([...prev, ...rows.map((r) => r.location).filter(Boolean)])).sort());
+        setListError('');
+        setListState('ready');
+      } catch (err) {
+        if (seq !== requestSeq.current) return;
+        setListError(err instanceof Error ? err.message : 'Could not reach the server.');
+        setListState('error');
+      }
+    },
+    [currentPage, pageSize, selectedStatus, debouncedSearch, selectedAssociation, selectedLocation]
+  );
+
+  // Reload whenever the page, filters or search change
+  useEffect(() => {
+    loadAgents();
+  }, [loadAgents]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetchRegisteredAgents();
+      await loadAgents();
       if (selectedAgent) {
         await fetchAgentAuditLogs(selectedAgent.id);
       }
@@ -90,70 +190,18 @@ export const PendingAgentsView: React.FC = () => {
     }
   };
 
-  // Derive unique associations and locations for dropdown filters
-  const uniqueAssociations = useMemo(() => {
-    const set = new Set<string>();
-    registeredAgents.forEach((a) => {
-      if (a.association) set.add(a.association);
-    });
-    return Array.from(set).sort();
-  }, [registeredAgents]);
+  // Dropdown options come from the agents the server has returned so far, plus any active selection
+  const uniqueAssociations = useMemo(
+    () => Array.from(new Set([...knownAssociations, ...(selectedAssociation !== 'all' ? [selectedAssociation] : [])])).sort(),
+    [knownAssociations, selectedAssociation]
+  );
+  const uniqueLocations = useMemo(
+    () => Array.from(new Set([...knownLocations, ...(selectedLocation !== 'all' ? [selectedLocation] : [])])).sort(),
+    [knownLocations, selectedLocation]
+  );
 
-  const uniqueLocations = useMemo(() => {
-    const set = new Set<string>();
-    registeredAgents.forEach((a) => {
-      if (a.location) set.add(a.location);
-    });
-    return Array.from(set).sort();
-  }, [registeredAgents]);
-
-  // Overall KPI statistics
-  const stats = useMemo(() => {
-    const pending = registeredAgents.filter((a) => a.status === 'pending').length;
-    const approved = registeredAgents.filter((a) => a.status === 'approved').length;
-    const rejected = registeredAgents.filter((a) => a.status === 'rejected').length;
-    const suspended = registeredAgents.filter((a) => a.status === 'suspended').length;
-    return { pending, approved, rejected, suspended, total: registeredAgents.length };
-  }, [registeredAgents]);
-
-  // Filtered agents
-  const filteredAgents = useMemo(() => {
-    return registeredAgents.filter((agent) => {
-      // Status filter
-      if (selectedStatus !== 'all' && agent.status !== selectedStatus) {
-        return false;
-      }
-      // Association filter
-      if (selectedAssociation !== 'all' && agent.association !== selectedAssociation) {
-        return false;
-      }
-      // Location filter
-      if (selectedLocation !== 'all' && agent.location !== selectedLocation) {
-        return false;
-      }
-      // Search term
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
-        const matchesName = (agent.full_name || '').toLowerCase().includes(q);
-        const matchesEmail = (agent.email || '').toLowerCase().includes(q);
-        const matchesPhone = (agent.phone || '').includes(q);
-        const matchesAssoc = (agent.association || '').toLowerCase().includes(q);
-        const matchesLoc = (agent.location || '').toLowerCase().includes(q);
-        const matchesId = (agent.id || '').toLowerCase().includes(q);
-        if (!matchesName && !matchesEmail && !matchesPhone && !matchesAssoc && !matchesLoc && !matchesId) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [registeredAgents, selectedStatus, selectedAssociation, selectedLocation, searchTerm]);
-
-  // Paginated agents
-  const totalPages = Math.ceil(filteredAgents.length / pageSize) || 1;
-  const paginatedAgents = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredAgents.slice(start, start + pageSize);
-  }, [filteredAgents, currentPage, pageSize]);
+  // Overall KPI counts as reported by the server (not counted from the current page)
+  const stats = summary;
 
   // Open detail view
   const handleOpenDetail = (agent: RegisteredAgent) => {
@@ -179,7 +227,7 @@ export const PendingAgentsView: React.FC = () => {
 
   // Execute Action
   const handleConfirmAction = async () => {
-    if (!selectedAgent || !actionType) return;
+    if (!selectedAgent || !actionType || isSubmittingAction) return;
 
     if (actionType === 'reject' && !actionReason.trim()) {
       setReasonError('A detailed rejection reason is required so the field agent can understand the compliance issue.');
@@ -188,6 +236,7 @@ export const PendingAgentsView: React.FC = () => {
 
     setIsSubmittingAction(true);
     setActionErrorMessage(null);
+    let updatedAgent: RegisteredAgent | null = null;
 
     try {
       if (actionType === 'approve') {
@@ -197,6 +246,7 @@ export const PendingAgentsView: React.FC = () => {
           body: JSON.stringify({}),
         });
         const data = await res.json().catch(() => null);
+        if (res.ok && data?.agent) updatedAgent = data.agent as RegisteredAgent;
         if (!res.ok) {
           throw new Error(data?.message || `The server could not approve this agent (HTTP ${res.status}).`);
         }
@@ -229,6 +279,7 @@ export const PendingAgentsView: React.FC = () => {
           body: JSON.stringify({ rejection_reason: actionReason.trim() }),
         });
         const data = await res.json().catch(() => null);
+        if (res.ok && data?.agent) updatedAgent = data.agent as RegisteredAgent;
         if (!res.ok) {
           throw new Error(data?.message || `The server could not reject this agent (HTTP ${res.status}).`);
         }
@@ -240,6 +291,7 @@ export const PendingAgentsView: React.FC = () => {
           body: JSON.stringify({ reason: actionReason.trim() || 'Operational audit hold' }),
         });
         const data = await res.json().catch(() => null);
+        if (res.ok && data?.agent) updatedAgent = data.agent as RegisteredAgent;
         if (!res.ok) {
           throw new Error(data?.message || `The server could not suspend this agent (HTTP ${res.status}).`);
         }
@@ -251,6 +303,7 @@ export const PendingAgentsView: React.FC = () => {
           body: JSON.stringify({}),
         });
         const data = await res.json().catch(() => null);
+        if (res.ok && data?.agent) updatedAgent = data.agent as RegisteredAgent;
         if (!res.ok) {
           throw new Error(data?.message || `The server could not reinstate this agent (HTTP ${res.status}).`);
         }
@@ -258,10 +311,9 @@ export const PendingAgentsView: React.FC = () => {
       }
 
       // Update local selected agent and audit log
-      await fetchRegisteredAgents();
-      await fetchAgentAuditLogs(selectedAgent.id);
-      const updated = registeredAgents.find((a) => a.id === selectedAgent.id);
-      if (updated) setSelectedAgent(updated);
+      // The server's answer is the source of truth: reload this page and the shared roster/badge count.
+      await Promise.all([loadAgents(true), fetchRegisteredAgents(), fetchAgentAuditLogs(selectedAgent.id)]);
+      if (updatedAgent) setSelectedAgent(updatedAgent);
 
       setActionType(null);
       setActionReason('');
@@ -332,8 +384,13 @@ export const PendingAgentsView: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Pending Card */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedStatus === 'pending'}
+          aria-label="Show pending agents"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedStatus('pending'); setCurrentPage(1); } }}
           onClick={() => { setSelectedStatus('pending'); setCurrentPage(1); }}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl border transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A4D2E] ${
             selectedStatus === 'pending'
               ? 'bg-[#FBFCFB] dark:bg-[#192D21] border-[#B8860B] ring-1 ring-[#B8860B] shadow-xs'
               : 'bg-white dark:bg-[#14261C] border-[#E5EBE7] dark:border-[#243B2C] hover:border-[#D1DBD5]'
@@ -354,8 +411,13 @@ export const PendingAgentsView: React.FC = () => {
 
         {/* Approved Card */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedStatus === 'approved'}
+          aria-label="Show approved agents"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedStatus('approved'); setCurrentPage(1); } }}
           onClick={() => { setSelectedStatus('approved'); setCurrentPage(1); }}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl border transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A4D2E] ${
             selectedStatus === 'approved'
               ? 'bg-[#FBFCFB] dark:bg-[#192D21] border-[#1A4D2E] ring-1 ring-[#1A4D2E] shadow-xs'
               : 'bg-white dark:bg-[#14261C] border-[#E5EBE7] dark:border-[#243B2C] hover:border-[#D1DBD5]'
@@ -376,8 +438,13 @@ export const PendingAgentsView: React.FC = () => {
 
         {/* Rejected Card */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedStatus === 'rejected'}
+          aria-label="Show rejected agents"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedStatus('rejected'); setCurrentPage(1); } }}
           onClick={() => { setSelectedStatus('rejected'); setCurrentPage(1); }}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl border transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A4D2E] ${
             selectedStatus === 'rejected'
               ? 'bg-[#FBFCFB] dark:bg-[#192D21] border-[#A63A2E] ring-1 ring-[#A63A2E] shadow-xs'
               : 'bg-white dark:bg-[#14261C] border-[#E5EBE7] dark:border-[#243B2C] hover:border-[#D1DBD5]'
@@ -398,8 +465,13 @@ export const PendingAgentsView: React.FC = () => {
 
         {/* Suspended Card */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedStatus === 'suspended'}
+          aria-label="Show suspended agents"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedStatus('suspended'); setCurrentPage(1); } }}
           onClick={() => { setSelectedStatus('suspended'); setCurrentPage(1); }}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl border transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A4D2E] ${
             selectedStatus === 'suspended'
               ? 'bg-[#FBFCFB] dark:bg-[#192D21] border-[#3A5A7A] ring-1 ring-[#3A5A7A] shadow-xs'
               : 'bg-white dark:bg-[#14261C] border-[#E5EBE7] dark:border-[#243B2C] hover:border-[#D1DBD5]'
@@ -428,14 +500,17 @@ export const PendingAgentsView: React.FC = () => {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              aria-label="Search agents by name, email, phone, cooperative, location or ID"
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by agent name, email, phone (+234...), cooperative, or location..."
               className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm rounded-lg border border-[#D1DBD5] dark:border-[#2D4536] bg-[#FBFCFB] dark:bg-[#162B20] text-[#1A2E23] dark:text-[#E8F0EA] focus:outline-none focus:ring-1 focus:ring-[#1A4D2E] focus:border-[#1A4D2E]"
             />
             {searchTerm && (
               <button
+                type="button"
+                aria-label="Clear search"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#8A968E] hover:text-[#1A2E23]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#6B7A70] hover:text-[#1A2E23] focus-visible:outline-2 focus-visible:outline-[#1A4D2E]"
               >
                 ✕
               </button>
@@ -514,6 +589,7 @@ export const PendingAgentsView: React.FC = () => {
             <span className="text-[#8A968E]">Cooperative:</span>
             <select
               value={selectedAssociation}
+              aria-label="Filter by cooperative"
               onChange={(e) => { setSelectedAssociation(e.target.value); setCurrentPage(1); }}
               className="py-1 px-2.5 rounded-md border border-[#D1DBD5] dark:border-[#2D4536] bg-[#FBFCFB] dark:bg-[#162B20] text-[#1A2E23] dark:text-[#E8F0EA] focus:outline-none focus:ring-1 focus:ring-[#1A4D2E]"
             >
@@ -529,6 +605,7 @@ export const PendingAgentsView: React.FC = () => {
             <span className="text-[#8A968E]">Location:</span>
             <select
               value={selectedLocation}
+              aria-label="Filter by location"
               onChange={(e) => { setSelectedLocation(e.target.value); setCurrentPage(1); }}
               className="py-1 px-2.5 rounded-md border border-[#D1DBD5] dark:border-[#2D4536] bg-[#FBFCFB] dark:bg-[#162B20] text-[#1A2E23] dark:text-[#E8F0EA] focus:outline-none focus:ring-1 focus:ring-[#1A4D2E]"
             >
@@ -552,7 +629,23 @@ export const PendingAgentsView: React.FC = () => {
 
       {/* 4. Agents List / Table */}
       <div className="bg-white dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#243B2C] rounded-xl shadow-xs overflow-hidden">
-        {filteredAgents.length === 0 ? (
+        {listState === 'error' ? (
+          <div role="alert" className="py-14 px-6 text-center space-y-3">
+            <p className="text-sm font-bold text-[#A63A2E]">Error: the agent list could not be loaded</p>
+            <p className="text-xs text-[#5A6B60] dark:text-[#A1B2A7]">{listError}</p>
+            <button
+              type="button"
+              onClick={() => loadAgents()}
+              className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#1A4D2E] text-white hover:bg-[#0F3320] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A4D2E]"
+            >
+              Try again
+            </button>
+          </div>
+        ) : listState === 'loading' && agents.length === 0 ? (
+          <div role="status" className="py-14 px-6 text-center text-xs text-[#5A6B60] dark:text-[#A1B2A7]">
+            Loading field agents…
+          </div>
+        ) : agents.length === 0 ? (
           /* Empty State */
           <div className="py-16 px-6 text-center">
             <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[#EEF5F1] dark:bg-[#1E3627] text-[#1A4D2E] dark:text-[#D8E8DE] flex items-center justify-center">
@@ -562,7 +655,7 @@ export const PendingAgentsView: React.FC = () => {
               No field agent applications found
             </h3>
             <p className="text-xs text-[#5A6B60] dark:text-[#A1B2A7] max-w-md mx-auto mt-1.5">
-              {searchTerm || selectedAssociation !== 'all' || selectedLocation !== 'all'
+              {debouncedSearch || selectedAssociation !== 'all' || selectedLocation !== 'all'
                 ? 'No agents matched the selected filter criteria. Try adjusting your search query or reset filters.'
                 : selectedStatus === 'pending'
                 ? 'There are currently no agent applications pending review. All field agents have been reviewed.'
@@ -592,7 +685,7 @@ export const PendingAgentsView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5EBE7] dark:divide-[#243B2C] text-xs">
-                {paginatedAgents.map((agent) => {
+                {agents.map((agent) => {
                   const isPending = agent.status === 'pending';
                   const isApproved = agent.status === 'approved';
                   const isRejected = agent.status === 'rejected';
@@ -602,7 +695,10 @@ export const PendingAgentsView: React.FC = () => {
                     <tr
                       key={agent.id}
                       onClick={() => handleOpenDetail(agent)}
-                      className="hover:bg-[#F7F9F7] dark:hover:bg-[#182C20] transition-colors cursor-pointer group"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) handleOpenDetail(agent); }}
+                      aria-label={`Open details for ${agent.full_name}`}
+                      className="hover:bg-[#F7F9F7] dark:hover:bg-[#182C20] transition-colors cursor-pointer group focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#1A4D2E]"
                     >
                       {/* Name & ID */}
                       <td className="py-3.5 px-4">
@@ -689,6 +785,11 @@ export const PendingAgentsView: React.FC = () => {
                             Suspended
                           </span>
                         )}
+                        {agent.reviewed_by && (
+                          <div className="mt-1 text-[10px] font-normal text-[#5A6B60] dark:text-[#A1B2A7]">
+                            by {agent.reviewed_by}{agent.reviewed_at ? ` · ${formatLagos(agent.reviewed_at)}` : ''}
+                          </div>
+                        )}
                       </td>
 
                       {/* Action Button */}
@@ -698,6 +799,7 @@ export const PendingAgentsView: React.FC = () => {
                             <>
                               <button
                                 onClick={() => handleInitiateAction('approve', agent)}
+                                aria-label={`Approve ${agent.full_name}`}
                                 title="Approve Agent"
                                 className="px-2.5 py-1.5 rounded-md bg-[#1A4D2E] hover:bg-[#0F3320] text-white font-semibold text-xs transition-all cursor-pointer shadow-2xs"
                               >
@@ -705,6 +807,7 @@ export const PendingAgentsView: React.FC = () => {
                               </button>
                               <button
                                 onClick={() => handleInitiateAction('reject', agent)}
+                                aria-label={`Reject ${agent.full_name}`}
                                 title="Reject Agent"
                                 className="px-2.5 py-1.5 rounded-md bg-white border border-[#A63A2E] text-[#A63A2E] hover:bg-[#A63A2E]/10 font-semibold text-xs transition-all cursor-pointer"
                               >
@@ -731,12 +834,13 @@ export const PendingAgentsView: React.FC = () => {
         )}
 
         {/* 5. Pagination Footer */}
-        {filteredAgents.length > 0 && (
+        {serverTotal > 0 && (
           <div className="py-3.5 px-4 border-t border-[#E5EBE7] dark:border-[#243B2C] bg-[#FBFCFB] dark:bg-[#162B20] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#5A6B60] dark:text-[#A1B2A7]">
             <div className="flex items-center gap-2">
               <span>Rows per page:</span>
               <select
                 value={pageSize}
+                aria-label="Rows per page"
                 onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
                 className="py-1 px-2 rounded border border-[#D1DBD5] dark:border-[#2D4536] bg-white dark:bg-[#14261C] text-[#1A2E23] dark:text-[#E8F0EA]"
               >
@@ -745,12 +849,14 @@ export const PendingAgentsView: React.FC = () => {
                 <option value={50}>50</option>
               </select>
               <span className="text-[#8A968E] ml-2">
-                Showing {Math.min((currentPage - 1) * pageSize + 1, filteredAgents.length)} to {Math.min(currentPage * pageSize, filteredAgents.length)} of {filteredAgents.length} agents
+                Showing {Math.min((currentPage - 1) * pageSize + 1, serverTotal)} to {Math.min(currentPage * pageSize, serverTotal)} of {serverTotal} agents
               </span>
             </div>
 
             <div className="flex items-center gap-1.5">
               <button
+                type="button"
+                aria-label="Previous page"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
                 className="p-1.5 rounded-md border border-[#D1DBD5] dark:border-[#2D4536] bg-white dark:bg-[#14261C] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F7F9F7] cursor-pointer"
@@ -761,6 +867,8 @@ export const PendingAgentsView: React.FC = () => {
                 Page {currentPage} of {totalPages}
               </span>
               <button
+                type="button"
+                aria-label="Next page"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages}
                 className="p-1.5 rounded-md border border-[#D1DBD5] dark:border-[#2D4536] bg-white dark:bg-[#14261C] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F7F9F7] cursor-pointer"
@@ -775,7 +883,13 @@ export const PendingAgentsView: React.FC = () => {
       {/* 6. Detailed Drawer / Modal */}
       {isDetailOpen && selectedAgent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#243B2C] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div
+            ref={detailRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Agent details: ${selectedAgent.full_name}`}
+            className="bg-white dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#243B2C] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95"
+          >
             {/* Modal Header */}
             <div className="p-6 border-b border-[#E5EBE7] dark:border-[#243B2C] bg-[#FBFCFB] dark:bg-[#162B20] flex items-start justify-between">
               <div className="flex items-start gap-3.5">
@@ -817,6 +931,8 @@ export const PendingAgentsView: React.FC = () => {
               </div>
 
               <button
+                type="button"
+                aria-label="Close agent details"
                 onClick={() => setIsDetailOpen(false)}
                 className="w-8 h-8 rounded-full border border-[#D1DBD5] dark:border-[#2D4536] flex items-center justify-center text-[#5A6B60] hover:text-[#1A2E23] cursor-pointer"
               >
@@ -865,8 +981,8 @@ export const PendingAgentsView: React.FC = () => {
                       </p>
                       <div className="text-[11px] text-[#A63A2E] mt-2">
                         {selectedAgent.reviewed_by
-                          ? <>Reviewed by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}</>
-                          : (selectedAgent.reviewed_at ? `Actioned on ${new Date(selectedAgent.reviewed_at).toUTCString()}` : null)}
+                          ? <>Reviewed by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? formatLagos(selectedAgent.reviewed_at) : 'N/A'}</>
+                          : (selectedAgent.reviewed_at ? `Actioned on ${formatLagos(selectedAgent.reviewed_at)}` : null)}
                       </div>
                     </div>
                   )}
@@ -882,8 +998,8 @@ export const PendingAgentsView: React.FC = () => {
                       </p>
                       <div className="text-[11px] text-[#3A5A7A] mt-2">
                         {selectedAgent.reviewed_by
-                          ? <>Actioned by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}</>
-                          : (selectedAgent.reviewed_at ? `Actioned on ${new Date(selectedAgent.reviewed_at).toUTCString()}` : null)}
+                          ? <>Actioned by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? formatLagos(selectedAgent.reviewed_at) : 'N/A'}</>
+                          : (selectedAgent.reviewed_at ? `Actioned on ${formatLagos(selectedAgent.reviewed_at)}` : null)}
                       </div>
                     </div>
                   )}
@@ -899,8 +1015,8 @@ export const PendingAgentsView: React.FC = () => {
                       </p>
                       <div className="text-[11px] text-[#1A4D2E] mt-2">
                         {selectedAgent.reviewed_by
-                          ? <>Approved by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? new Date(selectedAgent.reviewed_at).toUTCString() : 'N/A'}</>
-                          : (selectedAgent.reviewed_at ? `Approved on ${new Date(selectedAgent.reviewed_at).toUTCString()}` : null)}
+                          ? <>Approved by: <strong>{selectedAgent.reviewed_by}</strong> on {selectedAgent.reviewed_at ? formatLagos(selectedAgent.reviewed_at) : 'N/A'}</>
+                          : (selectedAgent.reviewed_at ? `Approved on ${formatLagos(selectedAgent.reviewed_at)}` : null)}
                       </div>
                     </div>
                   )}
@@ -1075,7 +1191,13 @@ export const PendingAgentsView: React.FC = () => {
       {/* 7. Action Confirmation & Rejection Reason Dialog */}
       {actionType && selectedAgent && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#243B2C] rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 space-y-4">
+          <div
+            ref={actionRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${actionType === 'approve' ? 'Approve' : actionType === 'reject' ? 'Decline' : actionType === 'suspend' ? 'Suspend' : 'Reinstate'} field agent ${selectedAgent.full_name}`}
+            className="bg-white dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#243B2C] rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 space-y-4"
+          >
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
