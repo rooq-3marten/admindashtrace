@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShieldCheck } from '@phosphor-icons/react';
@@ -11,8 +11,13 @@ import { DataProvider } from './context/DataContext';
 import { Header } from './components/layout/Header';
 import { Sidebar, TabType } from './components/layout/Sidebar';
 import { AnalyticsDashboard } from './components/dashboard/AnalyticsDashboard';
-import { GisMapViewer } from './components/gis/GisMapViewer';
-import { EudrEngineView } from './components/eudr/EudrEngineView';
+// Heavy views are loaded only when their tab is opened
+const GisMapViewer = lazy(() =>
+  import('./components/gis/GisMapViewer').then((m) => ({ default: m.GisMapViewer }))
+);
+const EudrEngineView = lazy(() =>
+  import('./components/eudr/EudrEngineView').then((m) => ({ default: m.EudrEngineView }))
+);
 import { FarmersRegistry } from './components/farmers/FarmersRegistry';
 import { PhiSentinel } from './components/compliance/PhiSentinel';
 import { ExportBatches } from './components/batches/ExportBatches';
@@ -164,11 +169,15 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
             )}
 
             {activeTab === 'gis_map' && (
-              <GisMapViewer onSelectFarmer={() => {}} />
+              <Suspense fallback={<div role="status" className="py-16 text-center text-xs text-[#5A6B60]">Loading map…</div>}>
+                <GisMapViewer onSelectFarmer={() => {}} />
+              </Suspense>
             )}
 
             {activeTab === 'eudr_engine' && (
-              <EudrEngineView />
+              <Suspense fallback={<div role="status" className="py-16 text-center text-xs text-[#5A6B60]">Loading EUDR engine…</div>}>
+                <EudrEngineView />
+              </Suspense>
             )}
 
             {activeTab === 'farmers' && (
