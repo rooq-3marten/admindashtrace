@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useModalA11y } from '../../lib/useModalA11y';
 import {
   ShieldCheck,
-  CheckCircle,
-  Eye,
-  EyeSlash,
   ArrowRight,
-  Lock,
-  EnvelopeSimple,
   Tree,
   Package,
   Users,
@@ -18,63 +14,25 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
-  const { loginWithCredentials, loginDemo, signInWithGoogle, isLoading, isAuthenticated, userProfile, signOut, authErrorMessage } = useAuth();
+  const { signInWithGoogle, isLoading, isAuthenticated, userProfile, signOut, authErrorMessage } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSuccess, setForgotSuccess] = useState(false);
   const [activeLegalDoc, setActiveLegalDoc] = useState<'terms' | 'privacy' | null>(null);
+  const legalRef = useModalA11y<HTMLDivElement>(activeLegalDoc !== null, () => setActiveLegalDoc(null));
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    if (!email.trim() || !password.trim()) {
-      setErrorMsg('Please enter both your email address and password.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const success = await loginWithCredentials(email.trim(), password, rememberMe);
-      if (success) {
-        if (onSuccessLogin) onSuccessLogin();
-      } else {
-        setErrorMsg("That email or password doesn't match our records. Try again.");
-      }
-    } catch (err) {
-      setErrorMsg("We couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDemoSignIn = async (role: 'super_admin' | 'compliance_officer' | 'fleet_manager') => {
+  // Administrators sign in with Google only. Access is decided by the server after sign-in.
+  const handleGoogleSignIn = async () => {
     setErrorMsg(null);
     setIsSubmitting(true);
     try {
-      await loginDemo(role);
+      await signInWithGoogle();
       if (onSuccessLogin) onSuccessLogin();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Google sign-in could not be completed.');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleForgotSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotEmail.trim()) return;
-    setForgotSuccess(true);
-    setTimeout(() => {
-      setForgotSuccess(false);
-      setIsForgotModalOpen(false);
-      setForgotEmail('');
-    }, 2500);
   };
 
   return (
@@ -246,121 +204,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
 
           {/* Error Banner */}
           {(authErrorMessage || errorMsg) && (
-            <div className="p-3.5 rounded-lg bg-[#FDEEEC] border border-[#FCA5A5] text-[#A63A2E] text-xs flex items-start gap-2.5 animate-in fade-in">
+            <div role="alert" className="p-3.5 rounded-lg bg-[#FDEEEC] border border-[#FCA5A5] text-[#A63A2E] text-xs flex items-start gap-2.5 animate-in fade-in">
               <span className="w-1.5 h-1.5 rounded-full bg-[#A63A2E] mt-1.5 shrink-0" />
               <p className="leading-relaxed">{authErrorMessage || errorMsg}</p>
             </div>
           )}
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[#1A2E23]">
-                Email address
-              </label>
-              <div className="relative">
-                <EnvelopeSimple className="w-4 h-4 text-[#8A968E] absolute left-3 top-3.5" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@traceharvest.com"
-                  autoComplete="email"
-                  required
-                  className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border border-[#E5EBE7] bg-[#FBFCFB] text-[#1A2E23] placeholder-[#8A968E] focus:outline-none focus:border-[#1A4D2E] focus:ring-1 focus:ring-[#1A4D2E] transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-[#1A2E23]">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsForgotModalOpen(true)}
-                  className="text-xs font-medium text-[#1A4D2E] hover:underline cursor-pointer"
-                >
-                  Forgot your password?
-                </button>
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-[#8A968E] absolute left-3 top-3.5" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
-                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-lg border border-[#E5EBE7] bg-[#FBFCFB] text-[#1A2E23] placeholder-[#8A968E] focus:outline-none focus:border-[#1A4D2E] focus:ring-1 focus:ring-[#1A4D2E] transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-[#8A968E] hover:text-[#1A2E23] cursor-pointer"
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="rememberMe"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded border-[#D1DBD5] text-[#1A4D2E] focus:ring-[#1A4D2E] cursor-pointer"
-              />
-              <label htmlFor="rememberMe" className="text-xs text-[#5A6B60] select-none cursor-pointer">
-                Keep me signed in for 30 days
-              </label>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting || isLoading}
-              className="w-full h-12 rounded-lg bg-[#1A4D2E] hover:bg-[#0F3320] active:scale-[0.99] text-white font-medium text-sm transition-all cursor-pointer shadow-warm-card flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              <span>{isSubmitting ? 'Signing in…' : 'Sign in'}</span>
-              {!isSubmitting && <ArrowRight size={16} />}
-            </button>
-          </form>
-
-          {/* Google Admin SSO */}
-          <div className="relative my-4 flex items-center justify-center">
-            <div className="border-t border-[#E5EBE7] w-full" />
-            <span className="bg-white px-3 text-xs text-[#8A968E] font-medium uppercase tracking-wider absolute">
-              Or authenticate with
-            </span>
-          </div>
-
-          <div>
+          {/* Google sign-in (the only administrator sign-in method) */}
+          <div className="space-y-3">
             <button
               type="button"
-              onClick={async () => {
-                setErrorMsg(null);
-                setIsSubmitting(true);
-                try {
-                  await signInWithGoogle();
-                  if (onSuccessLogin) onSuccessLogin();
-                } catch (err: any) {
-                  setErrorMsg(err.message || 'Google sign-in could not be completed.');
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
+              onClick={handleGoogleSignIn}
               disabled={isSubmitting || isLoading}
-              className="w-full py-2.5 px-3 rounded-lg border border-[#D1DBD5] bg-white hover:bg-[#F7F9F7] active:scale-[0.99] text-xs font-semibold text-[#1A2E23] transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-2xs disabled:opacity-60"
+              aria-busy={isSubmitting || isLoading}
+              className="w-full h-12 rounded-lg border border-[#D1DBD5] bg-white hover:bg-[#F7F9F7] active:scale-[0.99] text-sm font-semibold text-[#1A2E23] transition-all flex items-center justify-center gap-3 cursor-pointer shadow-2xs disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1A4D2E]"
             >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+              <svg aria-hidden="true" className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -378,8 +237,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>Sign in with Google (Authorized Administrator)</span>
+              <span>{isSubmitting || isLoading ? 'Signing in…' : 'Sign in with Google'}</span>
             </button>
+            <p className="text-xs text-[#5A6B60] leading-relaxed text-center">
+              Only authorised TraceHarvest administrator accounts can open the control center.
+            </p>
           </div>
 
           {/* Legal / Terms Footer */}
@@ -404,66 +266,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
-      {isForgotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-white rounded-xl border border-[#E5EBE7] shadow-xl p-6 space-y-4">
-            <h3 className="font-serif font-bold text-lg text-[#1A2E23]">
-              Reset your password
-            </h3>
-            <p className="text-xs text-[#5A6B60] leading-relaxed">
-              Enter the email address registered with your TraceHarvest admin account. We will send you an authorized verification link.
-            </p>
-
-            {forgotSuccess ? (
-              <div className="p-3 rounded-lg bg-[#EEF5F1] border border-[#B8D4C2] text-[#1A4D2E] text-xs flex items-center gap-2">
-                <CheckCircle size={16} />
-                <span>Reset instructions sent. Please check your inbox.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleForgotSubmit} className="space-y-4">
-                <input
-                  type="email"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="you@traceharvest.com"
-                  required
-                  className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-[#E5EBE7] bg-[#FBFCFB] text-[#1A2E23] focus:outline-none focus:border-[#1A4D2E]"
-                />
-
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsForgotModalOpen(false)}
-                    className="px-3 py-1.5 rounded-lg border border-[#E5EBE7] text-xs font-medium text-[#5A6B60] hover:bg-[#F7F9F7] cursor-pointer"
-                  >
-                    Never mind
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 rounded-lg bg-[#1A4D2E] hover:bg-[#0F3320] text-white text-xs font-semibold cursor-pointer"
-                  >
-                    Send reset link
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Legal & Compliance Modal */}
       {activeLegalDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-lg bg-white rounded-xl border border-[#E5EBE7] shadow-xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+          <div
+            ref={legalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={activeLegalDoc === 'terms' ? 'Terms of Service' : 'Privacy and Data Governance Policy'}
+            className="w-full max-w-lg bg-white rounded-xl border border-[#E5EBE7] shadow-xl p-6 space-y-4 max-h-[85vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-[#E5EBE7] pb-3">
               <h3 className="font-serif font-bold text-lg text-[#1A2E23]">
                 {activeLegalDoc === 'terms' ? 'Terms of Service — TraceHarvest' : 'Privacy & Data Governance Policy'}
               </h3>
               <button
                 type="button"
+                aria-label="Close"
                 onClick={() => setActiveLegalDoc(null)}
-                className="text-[#8A968E] hover:text-[#1A2E23] text-sm p-1 cursor-pointer"
+                className="text-[#5A6B60] hover:text-[#1A2E23] text-sm p-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#1A4D2E]"
               >
                 ✕
               </button>
