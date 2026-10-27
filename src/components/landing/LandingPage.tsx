@@ -13,6 +13,9 @@ interface LandingPageProps {
   onSuccessLogin?: () => void;
 }
 
+// Where access requests go. Set VITE_ACCESS_REQUEST_EMAIL in the hosting settings; with no value the link is hidden.
+const accessRequestEmail: string = (import.meta.env.VITE_ACCESS_REQUEST_EMAIL as string | undefined)?.trim() || '';
+
 export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
   const { signInWithGoogle, isLoading, isAuthenticated, userProfile, signOut, authErrorMessage } = useAuth();
 
@@ -134,13 +137,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
           </div>
         </div>
 
-        {/* Real Exporter Testimonial & Footer */}
+        {/* Footer. No testimonial is shown until a named exporter has agreed to be quoted. */}
         <div className="relative z-10 pt-6 border-t border-white/15 space-y-4">
-          <blockquote className="text-xs sm:text-sm text-white/85 italic leading-relaxed">
-            &ldquo;TraceHarvest helped us prove the quality of our sesame to buyers in Japan. We haven&apos;t had a rejected shipment since.&rdquo;
-          </blockquote>
           <div className="flex items-center justify-between text-xs text-white/60">
-            <span>— Anonymous agricultural exporter, Kano</span>
+            <span>Built for Nigeria&apos;s agricultural export corridor</span>
             
             {/* Subtle Nigerian flag accent */}
             <div className="flex items-center gap-1.5" title="Made in Nigeria">
@@ -241,6 +241,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
             </button>
             <p className="text-xs text-[#5A6B60] leading-relaxed text-center">
               Only authorised TraceHarvest administrator accounts can open the control center.
+            </p>
+            {accessRequestEmail && (
+              <p className="text-xs text-[#5A6B60] leading-relaxed text-center">
+                Need an account?{' '}
+                <a
+                  href={`mailto:${accessRequestEmail}?subject=${encodeURIComponent('TraceHarvest administrator access request')}&body=${encodeURIComponent('Name:\nOrganisation:\nRole:\nGoogle account e-mail to be approved:\n')}`}
+                  className="font-medium text-[#1A4D2E] underline hover:text-[#0F3320] focus-visible:outline-2 focus-visible:outline-[#1A4D2E]"
+                >
+                  Request access
+                </a>
+              </p>
+            )}
+            <p className="text-[11px] text-[#8A968E] leading-relaxed text-center">
+              You stay signed in on this browser until you choose Sign out. On a shared computer, always sign out when you finish.
             </p>
           </div>
 
