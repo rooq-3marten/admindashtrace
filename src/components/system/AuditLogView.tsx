@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, ArrowClockwise, Warning, Info } from '@phosphor-icons/react';
 import { apiFetch } from '../../lib/apiFetch';
 import { AgentAuditLog } from '../../types';
+import { AdminSignInLog } from './AdminSignInLog';
 
 const FETCH_LIMIT = 500;
 
@@ -283,6 +284,7 @@ export const AuditLogView: React.FC = () => {
           </div>
         )}
       </div>
+      <AdminSignInLog />
     </div>
   );
 };
