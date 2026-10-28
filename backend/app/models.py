@@ -200,3 +200,16 @@ class AgentAuditLog(Base):
     target_agent_name = Column(String(150), nullable=True)
     details = Column(Text, nullable=True)  # JSON object as text
     created_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+
+class AdminAccessLog(Base):
+    """Append-only record of administrator sign-in checks and sign-outs on the dashboard."""
+    __tablename__ = "admin_access_logs"
+
+    id = Column(String(64), primary_key=True, index=True)
+    email = Column(String(255), nullable=True, index=True)       # null when the token could not be verified
+    event = Column(String(30), nullable=False, index=True)       # sign_in | sign_in_rejected | sign_out
+    result_code = Column(String(40), nullable=True)              # error code for a rejection, e.g. NOT_AN_ADMIN
+    actor_ip = Column(String(64), nullable=True)
+    user_agent = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, index=True, default=now_utc)
