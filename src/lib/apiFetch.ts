@@ -63,9 +63,15 @@ function localResponse(status: number, error: string, message: string): Response
  * Retrieves a fresh Firebase ID token for each request and attaches
  * Authorization: Bearer <token> while preserving all existing headers and options.
  */
-export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export type ApiFetchInit = RequestInit & {
+  /** Sign-in verification handles a 401/403 itself and shows the server's real reason. */
+  suppressAuthHandler?: boolean;
+};
+
+export async function apiFetch(input: RequestInfo | URL, rawInit?: ApiFetchInit): Promise<Response> {
+  const { suppressAuthHandler, ...init } = rawInit ?? {};
   const urlStr = typeof input === 'string' ? input : input.toString();
-  const headers = new Headers(init?.headers);
+  const headers = new Headers(init.headers);
 
   // Firebase restores a saved sign-in asynchronously. Wait for it, otherwise a page refresh
   // looks like "nobody is signed in" for a moment and would wrongly end the session.
@@ -107,6 +113,10 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   });
 
   // Centralized authentication and authorization error handling
+  if (suppressAuthHandler) {
+    return response;
+  }
+
   if (response.status === 401) {
     triggerAuthError('session_expired', 'Session expired, please sign in again.');
   } else if (response.status === 403) {
