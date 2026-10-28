@@ -53,6 +53,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signOut = async () => {
+    // Record the sign-out while the token is still valid. Best effort: it never blocks signing out.
+    if (auth.currentUser) {
+      try {
+        await apiFetch('/api/v1/admin/sign-out', { method: 'POST', suppressAuthHandler: true });
+      } catch (_) {}
+    }
     try {
       await fbSignOut(auth);
     } catch (_) {}
@@ -105,7 +111,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // Fetch authoritative admin profile from backend GET /admin/me
         try {
-          const res = await apiFetch('/api/v1/admin/me');
+          const res = await apiFetch('/api/v1/admin/me', { suppressAuthHandler: true });
           if (res.status === 200) {
             const adminData = await res.json();
             const profile: UserProfile = {
@@ -132,8 +138,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setIsAuthenticated(false);
             }
           } else if (res.status === 401) {
-            await signOut();
-            setAuthErrorMessage('Session expired, please sign in again.');
+            // Google sign-in itself worked, but the server refused the token. That is a server
+            // configuration or token problem, not an expired session: say what the server said.
+            const errData = await res.json().catch(() => null);
+            console.warn('[Auth] /admin/me returned 401:', errData);
+            await failClosed(
+              `Signed in with Google, but the server did not accept your sign-in token${
+                errData?.error ? ` (${errData.error})` : ''
+              }. This is a server configuration issue, not an expired session.`
+            );
           } else {
             // The server could not confirm this account (outage, misconfiguration). Fail closed.
             console.warn(`[Auth] /admin/me returned HTTP ${res.status}. Signing out.`);
