@@ -3,6 +3,7 @@ import {
   Farmer,
   PracticeLog,
   ExportBatch,
+  FieldBatch,
   SyncLog,
   FieldAgent,
   AgentBatchSyncRequest,
@@ -40,6 +41,8 @@ interface DataContextType {
   farmers: Farmer[];
   practices: PracticeLog[];
   batches: ExportBatch[];
+  /** Batches recorded by field agents, as held by the server. */
+  fieldBatches: FieldBatch[];
   shipments: Shipment[];
   disputes: Dispute[];
   qualityAlerts: QualityAlert[];
@@ -133,6 +136,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return safeLoadStorage<SyncLog[]>('th2_sync_logs', INITIAL_SYNC_LOGS);
   });
 
+  // Comes only from the server, so it is never saved in the browser.
+  const [fieldBatches, setFieldBatches] = useState<FieldBatch[]>([]);
   const [agents, setAgents] = useState<FieldAgent[]>(() => {
     return safeLoadStorage<FieldAgent[]>('th2_agents', INITIAL_AGENTS);
   });
@@ -187,48 +192,49 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let gatewayOk = false;
     let gatewayStatus = 0;
     let serverTimeStr = new Date().toISOString();
-    let strengthPayload: any = null;
-
+    // 1. Is the server reachable? /sync/ping is a real route and needs no sign-in.
     try {
-      const res = await apiFetch('/api/v1/sync/strength-check', { cache: 'no-store' });
+      const res = await apiFetch('/api/v1/sync/ping', { cache: 'no-store' });
       gatewayStatus = res.status;
       if (res.ok) {
         gatewayOk = true;
-        strengthPayload = await res.json();
-        if (strengthPayload.server_time) serverTimeStr = strengthPayload.server_time;
+        const ping = await res.json();
+        if (ping.server_time) serverTimeStr = ping.server_time;
       }
     } catch (_) {
       gatewayOk = false;
     }
     const gatewayLatencyMs = Math.round(performance.now() - startGateway);
 
-    // Test Downstream Ingestion Cache Endpoint
+    // 2. Can we read sync data? /sync/status returns record counts and the latest sync event.
     const startDownstream = performance.now();
     let downstreamOk = false;
     let downstreamStatus = 0;
-    let downstreamRecords = 0;
+    let counts: { farmers: number; practices: number; batches: number; sync_logs: number } | null = null;
+    let latestEvent: { agent_id?: string; server_timestamp_ms?: number } | null = null;
     try {
-      const res = await apiFetch('/api/v1/sync/downstream?since_epoch_ms=0', { cache: 'no-store' });
+      const res = await apiFetch('/api/v1/sync/status', { cache: 'no-store' });
       downstreamStatus = res.status;
       if (res.ok) {
         downstreamOk = true;
         const data = await res.json();
-        downstreamRecords = data.farmers_count || (data.farmers?.length ?? 0);
+        counts = data.counts ?? null;
+        latestEvent = data.latest_event ?? null;
       }
     } catch (_) {
       downstreamOk = false;
     }
     const downstreamLatencyMs = Math.round(performance.now() - startDownstream);
+    const downstreamRecords = counts?.farmers ?? 0;
 
-    // Compute strictly factual, non-hallucinated mobile link status
-    const mobileLink = strengthPayload?.mobile_link || {
-      is_mobile_client_connected: false,
-      active_agents_15m_count: 0,
-      active_agents_60m_count: 0,
+    // 3. Mobile link, from facts only: the latest sync event and each agent's last sync time.
+    const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+    const latestEventMs = latestEvent?.server_timestamp_ms ?? null;
+    const mobileLink = {
+      is_mobile_client_connected: latestEventMs !== null && Date.now() - latestEventMs < FIFTEEN_MINUTES_MS,
+      active_agents_15m_count: agents.filter((a) => a.last_sync_epoch_ms && Date.now() - a.last_sync_epoch_ms < FIFTEEN_MINUTES_MS).length,
       total_registered_agents: agents.length,
-      offline_agents_count: agents.length,
-      latest_sync_event: syncLogs[0] || null,
-      time_since_latest_sync_ms: syncLogs[0] ? (Date.now() - syncLogs[0].server_timestamp_ms) : null,
+      latest_sync_event: latestEventMs !== null ? { agent_id: latestEvent?.agent_id ?? null, server_timestamp_ms: latestEventMs } : null,
     };
 
     const latestSyncMs = mobileLink.latest_sync_event ? mobileLink.latest_sync_event.server_timestamp_ms : null;
@@ -305,14 +311,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         latency_ms: downstreamLatencyMs,
         record_count: downstreamRecords,
       },
-      database: strengthPayload?.database || {
-        status: 'CONNECTED',
-        farmers_count: farmers.length,
-        practices_count: practices.length,
-        batches_count: batches.length,
-        documents_count: documents.length,
-        sync_logs_count: syncLogs.length,
-      },
+      // Server counts only. Not shown at all when the server did not answer.
+      database: counts
+        ? {
+            status: 'CONNECTED',
+            farmers_count: counts.farmers,
+            practices_count: counts.practices,
+            batches_count: counts.batches,
+            documents_count: documents.length,
+            sync_logs_count: counts.sync_logs,
+          }
+        : undefined,
       mobile_link: {
         active_mobile_devices: mobileLink.active_agents_15m_count || 0,
         online_agents_count: mobileLink.active_agents_15m_count || 0,
@@ -331,18 +340,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setConnectionReport(report);
     setIsCheckingStrength(false);
     return report;
-  }, [agents.length, syncLogs]);
+  }, [agents, documents.length]);
 
   // Bidirectional real-time sync with Express backend & field mobile app
   const syncWithMobileBackend = useCallback(async (isSilent = true) => {
     try {
       if (!isSilent) setIsSyncing(true);
-      const [resStatus, resFarmers, resPractices, resAgents, resDocs] = await Promise.all([
+      const [resStatus, resFarmers, resPractices, resAgents, resDocs, resFieldBatches] = await Promise.all([
         apiFetch('/api/v1/sync/status').catch(() => null),
         apiFetch('/api/v1/admin/farmers').catch(() => null),
         apiFetch('/api/v1/admin/practices').catch(() => null),
         apiFetch('/api/v1/admin/agents').catch(() => null),
         apiFetch('/api/v1/documents').catch(() => null),
+        apiFetch('/api/v1/admin/batches').catch(() => null),
       ]);
 
       if (resStatus && resStatus.ok) {
@@ -365,6 +375,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (resPractices && resPractices.ok) {
         const serverPractices: PracticeLog[] = await resPractices.json();
         if (Array.isArray(serverPractices)) setPractices(serverPractices);
+      }
+
+      if (resFieldBatches && resFieldBatches.ok) {
+        const serverBatches: FieldBatch[] = await resFieldBatches.json();
+        if (Array.isArray(serverBatches)) setFieldBatches(serverBatches);
       }
 
       if (resAgents && resAgents.ok) {
@@ -429,6 +444,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (isAuthenticated) return;
     setFarmers([]);
     setPractices([]);
+    setFieldBatches([]);
     setAgents([]);
     setDocuments([]);
     setRegisteredAgents([]);
@@ -1006,6 +1022,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         farmers,
         practices,
         batches,
+        fieldBatches,
         shipments,
         disputes,
         qualityAlerts,
