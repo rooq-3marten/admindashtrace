@@ -33,10 +33,10 @@ def get_admin_overview(db: Session = Depends(get_db)):
 
     # Calculate export ready percentage (Grade A batches)
     grade_a_batches = db.query(func.count(Batch.id)).filter(Batch.quality_grade.ilike("%Grade A%")).scalar() or 0
-    export_ready_pct = round((grade_a_batches / total_batches * 100), 1) if total_batches > 0 else 100.0
+    export_ready_pct = round((grade_a_batches / total_batches * 100), 1) if total_batches > 0 else None  # nothing to measure yet
 
-    # Total hectares approximated (average 2.5 ha per farmer or based on crops)
-    total_hectares = round(total_farmers * 2.8, 1)
+    # Hectares are the sum of what agents recorded. Farmers with no recorded size add nothing.
+    total_hectares = round(db.query(func.coalesce(func.sum(Farmer.farm_size_hectares), 0.0)).scalar() or 0.0, 1)
 
     # Action Required Items
     action_required = []
@@ -99,12 +99,32 @@ def get_admin_overview(db: Session = Depends(get_db)):
         "system_status": {
             "api_status": "OPERATIONAL",
             "database_status": "CONNECTED",
-            "sync_latency_ms": 38,
+            "sync_latency_ms": None,  # not measured
             "active_agents": active_agents,
-            "sync_success_rate": 99.8,
+            "sync_success_rate": sync_success_rate(db),
             "server_time": now_utc().isoformat()
         }
     }
+
+DASHBOARD_RISK_WORDS = {"COMPLIANT", "UNDER_REVIEW", "FLAGGED_HIGH_RISK"}
+
+def dashboard_risk(stored):
+    """The dashboard knows three risk words. Older app versions sent longer NAFDAC names; translate those."""
+    if stored in DASHBOARD_RISK_WORDS:
+        return stored
+    if stored in ("APPROVED_EXPORT_COMPLIANT", "APPROVED_ORGANIC_PREMIUM"):
+        return "COMPLIANT"
+    if stored == "BANNED_MRL_VIOLATION":
+        return "FLAGGED_HIGH_RISK"
+    return "UNDER_REVIEW"  # blank, restricted, unregistered, or unknown
+
+def sync_success_rate(db):
+    """Share of recorded sync events that succeeded. None until there is at least one event."""
+    total = db.query(func.count(SyncEvent.id)).scalar() or 0
+    if total == 0:
+        return None
+    ok = db.query(func.count(SyncEvent.id)).filter(SyncEvent.status == "success").scalar() or 0
+    return round(ok / total * 100, 1)
 
 @router.get("/agents")
 def get_admin_agents(db: Session = Depends(get_db)):
@@ -174,7 +194,7 @@ def get_admin_batches(db: Session = Depends(get_db)):
             "aggregation_gps_lat": b.aggregation_gps_lat,
             "aggregation_gps_lng": b.aggregation_gps_lng,
             "contributing_farmers_count": farmer_count,
-            "validation_status": "APPROVED" if "Grade A" in b.quality_grade else "UNDER_REVIEW",
+            "validation_status": "AWAITING_ADMIN_REVIEW",  # no batch approval step exists yet
             "created_at": b.created_at.isoformat() if b.created_at else None
         })
 
@@ -209,9 +229,9 @@ def get_system_status(db: Session = Depends(get_db)):
     return SystemStatusResponse(
         api_status = "OPERATIONAL",
         database_status = "CONNECTED",
-        sync_latency_ms = 42,
+        sync_latency_ms = None,  # not measured
         active_agent_connections = active_agents,
-        sync_success_rate_percent = 99.8,
+        sync_success_rate_percent = sync_success_rate(db),
         version = "1.0.0",
         server_time = now_utc()
     )
@@ -275,9 +295,9 @@ def get_admin_practices(db: Session = Depends(get_db)):
             "date_applied_epoch_ms": _to_ms(p.log_date) or 0,
             "pre_harvest_interval_days": p.pre_harvest_interval_days or 0,
             "nafdac_reg_no": p.nafdac_reg_no or "",
-            "nafdac_approved": True if p.nafdac_approved is None else p.nafdac_approved,
+            "nafdac_approved": bool(p.nafdac_approved),  # not confirmed approved counts as not approved
             "gps_coordinates": p.gps_coordinates or "",
-            "risk_level": p.risk_level or "COMPLIANT",
+            "risk_level": dashboard_risk(p.risk_level),
             "agent_id": p.agent_id or "",
             "verification_photo_uri": p.verification_photo_uri,
             "synced_at": _to_ms(p.synced_at),

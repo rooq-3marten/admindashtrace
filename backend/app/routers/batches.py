@@ -5,7 +5,7 @@ import uuid, random
 from datetime import datetime, timezone
 from app.database import get_db
 from app.routers.agent_accounts import agent_write_gate
-from app.security import require_admin
+from app.security import ApiError, require_admin
 from app.models import Batch, Farmer, Agent
 from app.schemas import BatchCreate, BatchOut
 
@@ -18,6 +18,8 @@ def create_batch(payload: BatchCreate, http_request: Request, db: Session = Depe
     The agent must be registered and approved, the same as for syncing.
     """
     agent_id = agent_write_gate(http_request, db, payload.agent_id)
+    if payload.total_quantity is None or not payload.quality_grade:
+        raise ApiError(400, "BATCH_FIELDS_REQUIRED", "A batch needs its weight and quality grade.")
     batch_id = payload.id or payload.client_uuid or str(uuid.uuid4())
     existing = db.query(Batch).filter(Batch.id == batch_id).first()
     if existing:

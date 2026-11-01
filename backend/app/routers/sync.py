@@ -33,6 +33,45 @@ def is_test_record(name, agent_id) -> bool:
         return True
     return bool(name and _TEST_NAME_RE.match(name))
 
+# --- Small helpers -----------------------------------------------------------
+# Rule for this file: a value the agent did not record is left empty (or the record is
+# refused). The server never fills the gap with a made-up value.
+
+def first_present(*values):
+    """First value that is not None. Unlike `a or b`, a real 0 or "" is kept."""
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+def saved(record_id, server_id=None, code=None):
+    return SyncRecordResult(id=record_id, status="SYNCED", server_id=server_id or record_id, code=code)
+
+def refused(record_id, status, reason):
+    """Every submitted record gets an answer, so the app knows exactly what was not saved."""
+    return SyncRecordResult(id=record_id, status=status, error=reason)
+
+def new_farmer_code(db, state):
+    prefix = (state or "NGR")[:3].upper()
+    while True:
+        code = f"TH-{prefix}-{now_utc().year}-{random.randint(1000, 9999)}"
+        if not db.query(Farmer).filter(Farmer.farmer_code == code).first():
+            return code
+
+def find_farmers(db, farmer_ids, farmer_codes):
+    """Farmers named by id or by code. "MULTIPLE" is a label from older app versions, not a code."""
+    codes = [c for c in farmer_codes if c and c != "MULTIPLE"]
+    found = {}
+    if farmer_ids:
+        for farmer in db.query(Farmer).filter(Farmer.id.in_(farmer_ids)).all():
+            found[farmer.id] = farmer
+    if codes:
+        for farmer in db.query(Farmer).filter(Farmer.farmer_code.in_(codes)).all():
+            found[farmer.id] = farmer
+    missing = [c for c in codes if c not in {f.farmer_code for f in found.values()}]
+    missing += [i for i in farmer_ids if i not in found]
+    return list(found.values()), missing
+
 @router.post("/sync/batch", response_model=BulkSyncResponse)
 @router.post("/api/v1/sync/upstream", response_model=BulkSyncResponse)
 def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = Depends(get_db)):
@@ -69,9 +108,9 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
         # Create agent record if new
         agent = Agent(
             id = agent_id,
-            name = f"Field Agent ({agent_id})",
-            phone = "+2348000000000",
-            state = "Kano",
+            name = agent_id,
+            phone = "",   # not recorded
+            state = "",   # not recorded
             status = "ACTIVE",
             device_id = request.device_id,
             last_sync_at = now_utc(),
@@ -103,36 +142,47 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
         existing = db.query(Farmer).filter(Farmer.id == client_uuid).first()
         if existing:
             assigned_farmer_ids[client_uuid] = existing.farmer_code
-            results.append(SyncRecordResult(id=client_uuid, status="SYNCED", server_id=existing.id, code=existing.farmer_code))
-        else:
-            state_str = f.state or "Kano"
-            state_code = state_str[:3].upper() if len(state_str) >= 3 else "NGR"
-            random_num = random.randint(1000, 9999)
-            official_code = f.farmer_code if (f.farmer_code and not "PENDING" in f.farmer_code) else f"TH-{state_code}-2026-{random_num}"
+            results.append(saved(client_uuid, existing.id, existing.farmer_code))
+            continue
 
-            new_farmer = Farmer(
-                id = client_uuid,
-                farmer_code = official_code,
-                name = f.full_name or f.name or "Enrolled Farmer",
-                phone = f.phone_number or f.phone or "+2348000000000",
-                gps_lat = f.latitude or f.gps_lat,
-                gps_lng = f.longitude or f.gps_lng,
-                crop_type = f.crop or f.crop_type or "Sesame",
-                cooperative = f.cooperative_name or f.cooperative,
-                state = f.state,
-                lga = f.lga,
-                community = f.community,
-                farm_size_hectares = f.farm_size_hectares,
-                gps_polygon = f.gps_polygon,
-                enrolled_by_agent_id = agent_id,
-                source = f.source or "agent",
-                created_at = now_utc(),
-                synced_at = now_utc()
-            )
-            db.add(new_farmer)
-            assigned_farmer_ids[client_uuid] = official_code
-            results.append(SyncRecordResult(id=client_uuid, status="SYNCED", server_id=client_uuid, code=official_code))
-            synced_farmers_count += 1
+        name = f.full_name or f.name
+        crop = f.crop or f.crop_type
+        if not name or not crop:
+            results.append(refused(client_uuid, "REJECTED_MISSING_FIELDS", "Farmer name and crop are required."))
+            continue
+
+        official_code = f.farmer_code
+        code_unusable = (
+            not official_code
+            or "PENDING" in official_code
+            or db.query(Farmer).filter(Farmer.farmer_code == official_code).first()
+        )
+        if code_unusable:
+            official_code = new_farmer_code(db, f.state)
+
+        db.add(Farmer(
+            id = client_uuid,
+            farmer_code = official_code,
+            name = name,
+            phone = f.phone_number or f.phone or "",   # blank means not recorded
+            gps_lat = first_present(f.latitude, f.gps_lat),
+            gps_lng = first_present(f.longitude, f.gps_lng),
+            crop_type = crop,
+            cooperative = f.cooperative_name or f.cooperative,
+            state = f.state,
+            lga = f.lga,
+            community = f.community,
+            farm_size_hectares = f.farm_size_hectares,
+            gps_polygon = f.gps_polygon,
+            enrolled_by_agent_id = agent_id,
+            source = f.source or "agent",
+            created_at = now_utc(),
+            synced_at = now_utc()
+        ))
+        db.flush()  # sessions here do not autoflush; later records in this request must find this farmer
+        assigned_farmer_ids[client_uuid] = official_code
+        results.append(saved(client_uuid, client_uuid, official_code))
+        synced_farmers_count += 1
 
     # 2. Process Practices
     for p in request.practices:
@@ -144,39 +194,50 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
             continue
 
         existing = db.query(PracticeLog).filter(PracticeLog.id == client_uuid).first()
-        if not existing:
-            # Resolve farmer_id
-            resolved_farmer_id = p.farmer_client_uuid or p.farmer_id
-            if not resolved_farmer_id and p.farmer_code:
-                farmer_rec = db.query(Farmer).filter(Farmer.farmer_code == p.farmer_code).first()
-                if farmer_rec:
-                    resolved_farmer_id = farmer_rec.id
+        if existing:
+            results.append(saved(client_uuid, existing.id))
+            continue
 
-            if resolved_farmer_id:
-                new_practice = PracticeLog(
-                    id = client_uuid,
-                    farmer_id = resolved_farmer_id,
-                    practice_type = p.practice_type,
-                    product_name = p.product_name,
-                    quantity = p.quantity_used or p.quantity or 1.0,
-                    active_ingredient = p.active_ingredient,
-                    dosage = p.dosage,
-                    quantity_unit = p.quantity_unit,
-                    pre_harvest_interval_days = p.pre_harvest_interval_days,
-                    nafdac_reg_no = p.nafdac_reg_no,
-                    nafdac_approved = p.nafdac_approved,
-                    gps_coordinates = p.gps_coordinates,
-                    risk_level = p.risk_level,
-                    verification_photo_uri = p.verification_photo_uri,
-                    log_date = (datetime.fromtimestamp(p.date_applied_epoch_ms / 1000, tz=timezone.utc) if p.date_applied_epoch_ms else None) or p.log_date or now_utc(),
-                    source = p.source or "agent",
-                    agent_id = agent_id,
-                    created_at = now_utc(),
-                    synced_at = now_utc()
-                )
-                db.add(new_practice)
-                results.append(SyncRecordResult(id=client_uuid, status="SYNCED", server_id=client_uuid))
-                synced_practices_count += 1
+        quantity = first_present(p.quantity_used, p.quantity)
+        if not p.practice_type or quantity is None:
+            results.append(refused(client_uuid, "REJECTED_MISSING_FIELDS", "The practice type and quantity are required."))
+            continue
+
+        # Find the farmer by id first, then by farmer code.
+        farmer = None
+        farmer_ref = p.farmer_client_uuid or p.farmer_id
+        if farmer_ref:
+            farmer = db.query(Farmer).filter(Farmer.id == farmer_ref).first()
+        if farmer is None and p.farmer_code:
+            farmer = db.query(Farmer).filter(Farmer.farmer_code == p.farmer_code).first()
+        if farmer is None:
+            results.append(refused(client_uuid, "REJECTED_FARMER_NOT_FOUND",
+                                   "The farmer is not on the server yet. It will be retried on the next sync."))
+            continue
+
+        db.add(PracticeLog(
+            id = client_uuid,
+            farmer_id = farmer.id,
+            practice_type = p.practice_type,
+            product_name = p.product_name,
+            quantity = quantity,
+            active_ingredient = p.active_ingredient,
+            dosage = p.dosage,
+            quantity_unit = p.quantity_unit,
+            pre_harvest_interval_days = p.pre_harvest_interval_days,
+            nafdac_reg_no = p.nafdac_reg_no,
+            nafdac_approved = p.nafdac_approved,
+            gps_coordinates = p.gps_coordinates,
+            risk_level = p.risk_level,
+            verification_photo_uri = p.verification_photo_uri,
+            log_date = (datetime.fromtimestamp(p.date_applied_epoch_ms / 1000, tz=timezone.utc) if p.date_applied_epoch_ms else None) or p.log_date or now_utc(),
+            source = p.source or "agent",
+            agent_id = agent_id,
+            created_at = now_utc(),
+            synced_at = now_utc()
+        ))
+        results.append(saved(client_uuid))
+        synced_practices_count += 1
 
     # 3. Process Batches
     for b in request.batches:
@@ -184,22 +245,38 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
         if not client_uuid:
             continue
 
+        farmers, missing = find_farmers(db, b.farmer_ids, b.farmer_codes)
+
         existing = db.query(Batch).filter(Batch.id == client_uuid).first()
-        if not existing:
-            new_batch = Batch(
-                id = client_uuid,
-                batch_code = b.batch_code or f"NG-{b.crop or 'SES'}-2026-{random.randint(1000, 9999)}-EXP",
-                agent_id = agent_id,
-                total_quantity = b.total_quantity or 0.0,
-                quality_grade = b.quality_grade or "Grade A Export Ready",
-                aggregation_gps_lat = b.aggregation_gps_lat,
-                aggregation_gps_lng = b.aggregation_gps_lng,
-                created_at = now_utc(),
-                synced_at = now_utc()
-            )
-            db.add(new_batch)
-            results.append(SyncRecordResult(id=client_uuid, status="SYNCED", server_id=client_uuid, code=new_batch.batch_code))
-            synced_batches_count += 1
+        if existing:
+            if not existing.farmers and farmers:   # batches saved before farmer links existed
+                existing.farmers = farmers
+            results.append(saved(client_uuid, existing.id, existing.batch_code))
+            continue
+
+        if not b.batch_code or not b.quality_grade or b.total_quantity is None:
+            results.append(refused(client_uuid, "REJECTED_MISSING_FIELDS",
+                                   "A batch needs its code, weight and quality grade."))
+            continue
+        if missing:
+            results.append(refused(client_uuid, "REJECTED_FARMER_NOT_FOUND",
+                                   f"Farmer not on the server yet: {', '.join(missing)}."))
+            continue
+
+        db.add(Batch(
+            id = client_uuid,
+            batch_code = b.batch_code,
+            agent_id = agent_id,
+            total_quantity = b.total_quantity,
+            quality_grade = b.quality_grade,
+            aggregation_gps_lat = b.aggregation_gps_lat,
+            aggregation_gps_lng = b.aggregation_gps_lng,
+            farmers = farmers,
+            created_at = now_utc(),
+            synced_at = now_utc()
+        ))
+        results.append(saved(client_uuid, client_uuid, b.batch_code))
+        synced_batches_count += 1
 
     # 4. Process Uploaded Documents (Mobile Field Capture)
     synced_documents_count = 0
