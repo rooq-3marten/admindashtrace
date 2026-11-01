@@ -20,6 +20,7 @@ import {
 } from '@phosphor-icons/react';
 import { generateOfficialEudrAnnexIIGeoJson, downloadGeoJsonFile } from '../../utils/eudrEngine';
 import { AuditDossierModal } from './AuditDossierModal';
+import { FieldBatchesPanel } from './FieldBatchesPanel';
 
 export const ExportBatches: React.FC = () => {
   const { batches, farmers, overrideBatchValidation } = useData();
@@ -123,12 +124,14 @@ export const ExportBatches: React.FC = () => {
   // Contributing smallholders for inspector
   const linkedFarmers = useMemo(() => {
     if (!activeDetailBatch) return [];
-    const list = farmers.filter((f) => activeDetailBatch.farmer_client_uuids?.includes(f.client_uuid));
-    return list.length > 0 ? list : farmers.slice(0, 5);
+    // Only farmers actually linked to this batch. Never fill the gap with unrelated farmers.
+    return farmers.filter((f) => activeDetailBatch.farmer_client_uuids?.includes(f.client_uuid));
   }, [farmers, activeDetailBatch]);
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto animate-in fade-in duration-150">
+      <FieldBatchesPanel />
+
       {/* Top Controls: Filter tabs & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Filter Tabs */}
