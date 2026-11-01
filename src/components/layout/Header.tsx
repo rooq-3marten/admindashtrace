@@ -219,7 +219,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Visual Signal Bars */}
             <div className="flex items-end gap-0.5 h-3.5 pr-0.5">
               {[1, 2, 3, 4].map((bar) => {
-                const currentBars = connectionReport?.bars ?? 3;
+                const currentBars = connectionReport?.bars ?? 0;
                 const isLit = bar <= currentBars;
                 const heightClass = bar === 1 ? 'h-1.5' : bar === 2 ? 'h-2' : bar === 3 ? 'h-2.5' : 'h-3.5';
                 const colorClass = !isLit
@@ -242,7 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'Gateway Offline'}
               </span>
               <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold bg-[#EEF5F1] dark:bg-[#20362A] text-[#1A4D2E] dark:text-[#D8E8DE]">
-                {connectionReport?.strength_score ?? 85}%
+                {connectionReport ? `${connectionReport.strength_score}%` : "—"}
               </span>
             </div>
           </button>
@@ -635,7 +635,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 border border-[#E5E7EB] dark:border-slate-700 flex flex-col items-center justify-center font-mono font-bold">
                     <span className="text-base text-[#111827] dark:text-white leading-none">
-                      {connectionReport?.strength_score ?? 85}
+                      {connectionReport ? connectionReport.strength_score : "—"}
                     </span>
                     <span className="text-[9px] text-[#6B7280] dark:text-slate-400">/ 100</span>
                   </div>
@@ -645,7 +645,7 @@ export const Header: React.FC<HeaderProps> = ({
                         Signal: {connectionReport?.signal_level ?? 'GOOD'}
                       </span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        {connectionReport?.bars ?? 3} / 4 Bars
+                        {connectionReport?.bars ?? 0} / 4 Bars
                       </span>
                     </div>
                     <p className="text-xs text-[#6B7280] dark:text-slate-400 mt-0.5">
