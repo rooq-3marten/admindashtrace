@@ -108,8 +108,8 @@ class BatchCreate(BaseModel):
     batch_code: Optional[str] = None
     crop: Optional[str] = None
     agent_id: Optional[str] = None
-    total_quantity: float = 0.0
-    quality_grade: str = "Grade A Export Ready"
+    total_quantity: Optional[float] = None   # no invented default: the agent must record it
+    quality_grade: Optional[str] = None      # no invented grade: the agent must record it
     aggregation_gps_lat: Optional[float] = None
     aggregation_gps_lng: Optional[float] = None
     farmer_ids: List[str] = []
@@ -199,6 +199,7 @@ class SyncRecordResult(BaseModel):
     status: str
     server_id: Optional[str] = None
     code: Optional[str] = None
+    error: Optional[str] = None   # why a record was not saved, shown to the field agent
 
 class BulkSyncResponse(BaseModel):
     status: str
@@ -225,15 +226,15 @@ class AdminOverviewKPI(BaseModel):
     total_batches: int
     total_tonnage: float
     active_agents: int
-    export_ready_percentage: float
+    export_ready_percentage: Optional[float] = None
     pending_syncs_count: int
     action_required_count: int
 
 class SystemStatusResponse(BaseModel):
     api_status: str
     database_status: str
-    sync_latency_ms: int
+    sync_latency_ms: Optional[int] = None
     active_agent_connections: int
-    sync_success_rate_percent: float
+    sync_success_rate_percent: Optional[float] = None
     version: str = "1.0.0"
     server_time: datetime
