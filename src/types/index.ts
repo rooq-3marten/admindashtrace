@@ -173,6 +173,17 @@ export interface PracticeLog {
   notes?: string;
 }
 
+/** A harvest batch recorded by a field agent in the Android app. Read-only on the dashboard. */
+export interface FieldBatch {
+  id: string;
+  batch_code: string;
+  agent_id: string | null;
+  total_quantity: number;
+  quality_grade: string;
+  contributing_farmers_count: number;
+  created_at: string | null;
+}
+
 export interface ExportBatch {
   id?: number;
   batch_number: string;
