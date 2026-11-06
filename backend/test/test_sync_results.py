@@ -114,3 +114,47 @@ def test_admin_practices_use_the_three_dashboard_risk_words(client):
     assert rows["p2"]["risk_level"] == "UNDER_REVIEW"
     assert rows["p2"]["nafdac_approved"] is False
     assert rows["p3"]["risk_level"] == "COMPLIANT"
+
+
+def test_batch_with_a_stale_farmer_code_is_still_saved(client):
+    # Older app versions send an offline code that no longer matches anything on the server.
+    batch = {"client_uuid": "b1", "batch_code": "NG-SES-1", "total_quantity": 50.0,
+             "quality_grade": "Grade B Local Processing", "farmer_codes": ["TH-KAN-PENDING-1234"]}
+    assert sync(client, batches=[batch])["b1"]["status"] == "SYNCED"
+
+
+def test_batch_with_several_farmers_links_them_all(client):
+    batch = {"client_uuid": "b1", "batch_code": "NG-SES-1", "total_quantity": 80.0,
+             "quality_grade": "Grade B Local Processing", "farmer_ids": ["f1", "f2"]}
+    sync(client, farmers=[farmer("f1"), farmer("f2", full_name="Bola")], batches=[batch])
+    assert client.get("/admin/batches").json()[0]["contributing_farmers_count"] == 2
+
+
+def test_duplicate_batch_code_is_refused_for_that_batch_only(client):
+    first = {"client_uuid": "b1", "batch_code": "NG-SES-1", "total_quantity": 50.0,
+             "quality_grade": "Grade B Local Processing"}
+    second = {**first, "client_uuid": "b2"}   # a different batch using the same code
+    third = {**first, "client_uuid": "b3", "batch_code": "NG-SES-2"}
+    results = sync(client, batches=[first, second, third])
+    assert results["b1"]["status"] == "SYNCED"
+    assert results["b2"]["status"] == "REJECTED_DUPLICATE_CODE"
+    assert results["b3"]["status"] == "SYNCED"
+
+
+# --- client_time: the device's creation time is kept only when it is believable ---
+from datetime import datetime, timezone
+from app.routers.sync import client_time
+
+_NOW = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
+
+def test_client_time_keeps_a_sensible_device_time():
+    ms = int(datetime(2026, 10, 1, 8, 30, tzinfo=timezone.utc).timestamp() * 1000)
+    assert client_time(ms, _NOW) == datetime(2026, 10, 1, 8, 30, tzinfo=timezone.utc)
+
+def test_client_time_falls_back_when_missing_or_wrong():
+    assert client_time(None, _NOW) == _NOW
+    assert client_time(0, _NOW) == _NOW                      # clock never set
+    assert client_time(1500000000000, _NOW) == _NOW          # 2017, before 2020
+    future = int(_NOW.timestamp() * 1000) + 3 * 24 * 3600 * 1000
+    assert client_time(future, _NOW) == _NOW                 # three days ahead
+    assert client_time(True, _NOW) == _NOW                   # not a number
