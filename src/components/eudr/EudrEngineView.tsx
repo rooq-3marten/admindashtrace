@@ -37,6 +37,7 @@ import {
   validateAndCleanTopology,
   detectBoundaryOverlaps,
   analyzeRemoteSensingTreeCover,
+  TREE_COVER_LOSS_THRESHOLD_HA,
   generateOfficialEudrAnnexIIGeoJson,
   downloadGeoJsonFile,
   Point2D,
@@ -60,14 +61,10 @@ export const EudrEngineView: React.FC = () => {
   }, [farmers, selectedFarmerId]);
 
   // Remote Sensing Analysis for Selected Farmer
-  const [simulatedLossHa, setSimulatedLossHa] = useState<number | null>(null);
   const rsAnalysis = useMemo(() => {
     if (!selectedFarmer) return null;
-    return analyzeRemoteSensingTreeCover(
-      selectedFarmer,
-      simulatedLossHa !== null ? simulatedLossHa : undefined
-    );
-  }, [selectedFarmer, simulatedLossHa]);
+    return analyzeRemoteSensingTreeCover(selectedFarmer);
+  }, [selectedFarmer]);
 
   // Topology Analysis for Selected Farmer
   const topologyResult = useMemo(() => {
@@ -118,16 +115,16 @@ export const EudrEngineView: React.FC = () => {
 
   // Fleet-wide EUDR Statistics
   const stats = useMemo(() => {
-    let certifiedCount = 0;
+    let certifiedCount = 0; // plots with a recorded figure at or under the threshold
     let holdCount = 0;
     let totalHa = 0;
 
     for (const f of farmers) {
       const rs = analyzeRemoteSensingTreeCover(f);
-      totalHa += f.farm_size_hectares || 4.5;
-      if (rs.eudr_compliance_verdict === 'EUDR_CERTIFIED') {
+      totalHa += f.farm_size_hectares || 0;
+      if (rs.eudr_compliance_verdict === 'NO_LOSS_RECORDED') {
         certifiedCount++;
-      } else {
+      } else if (rs.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD') {
         holdCount++;
       }
     }
@@ -171,13 +168,10 @@ export const EudrEngineView: React.FC = () => {
   // Annex II Exporter State
   const [exportCommodity, setExportCommodity] = useState<string>('Sesame');
   const [exportCountry, setExportCountry] = useState<string>('NGA');
-  const [exportDdsId, setExportDdsId] = useState<string>('DDS-2026-90412');
-  const [exportOperator, setExportOperator] = useState<string>(
-    'TraceHarvest Export Logistics & Commodities Ltd'
-  );
-  const [exportEori, setExportEori] = useState<string>('NL847291038');
+  const [exportDdsId, setExportDdsId] = useState<string>('');
+  const [exportOperator, setExportOperator] = useState<string>('');
+  const [exportEori, setExportEori] = useState<string>('');
   const [copiedJson, setCopiedJson] = useState<boolean>(false);
-  const [copiedHash, setCopiedHash] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -203,13 +197,6 @@ export const EudrEngineView: React.FC = () => {
     setCopiedJson(true);
     showToast('Annex II GeoJSON copied to clipboard', 'info');
     setTimeout(() => setCopiedJson(false), 2000);
-  };
-
-  const handleCopyEvidenceHash = (hash: string) => {
-    navigator.clipboard.writeText(hash);
-    setCopiedHash(true);
-    showToast('Cryptographic Evidence Hash SHA-256 copied', 'info');
-    setTimeout(() => setCopiedHash(false), 2000);
   };
 
   const handleDownloadGeoJson = () => {
@@ -252,7 +239,7 @@ export const EudrEngineView: React.FC = () => {
               <span>Enterprise Geospatial & Automated EUDR Engine</span>
             </h1>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              Automated geometry topology cleaning, mutual smallholder boundary overlap detection, and Copernicus Sentinel-2 multispectral tree-cover validation against the December 31, 2020 regulatory forest baseline.
+              Automated geometry topology cleaning, mutual smallholder boundary overlap detection, and a review of any recorded post-December 2020 tree-cover loss. No satellite data source is connected yet.
             </p>
           </div>
 
@@ -266,8 +253,7 @@ export const EudrEngineView: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                setSimulatedLossHa(null);
-                showToast('Copernicus Sentinel-2 & GFW baseline re-synchronized across all smallholder parcels.', 'info');
+                showToast('Re-read recorded values for all parcels. No satellite source is connected.', 'info');
               }}
               className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 transition cursor-pointer"
             >
@@ -386,7 +372,7 @@ export const EudrEngineView: React.FC = () => {
           }`}
         >
           <Satellite className="w-4 h-4" />
-          <span>Copernicus Sentinel-2 & Forest Baseline</span>
+          <span>Recorded Tree-Cover Loss</span>
         </button>
 
         <button
@@ -427,7 +413,7 @@ export const EudrEngineView: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: Copernicus Sentinel-2 Remote Sensing & Forest Baseline Validation   */}
+      {/* TAB 1: Recorded tree-cover loss review                                      */}
       {/* ========================================================================= */}
       {activeTab === 'remote_sensing' && selectedFarmer && rsAnalysis && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -447,14 +433,14 @@ export const EudrEngineView: React.FC = () => {
                 {farmers.map((farmer) => {
                   const isSelected = farmer.client_uuid === selectedFarmer.client_uuid;
                   const itemRs = analyzeRemoteSensingTreeCover(farmer);
-                  const isCertified = itemRs.eudr_compliance_verdict === 'EUDR_CERTIFIED';
+                  const isCertified = itemRs.eudr_compliance_verdict === 'NO_LOSS_RECORDED';
+                  const notAssessed = itemRs.eudr_compliance_verdict === 'NOT_ASSESSED';
 
                   return (
                     <div
                       key={farmer.client_uuid}
                       onClick={() => {
                         setSelectedFarmerId(farmer.client_uuid);
-                        setSimulatedLossHa(null);
                       }}
                       className={`p-3 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
                         isSelected
@@ -480,15 +466,17 @@ export const EudrEngineView: React.FC = () => {
                       <div className="text-right shrink-0">
                         <span
                           className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-full inline-flex items-center gap-1 border ${
-                            isCertified
+                            notAssessed
+                              ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-600'
+                              : isCertified
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700'
                           }`}
                         >
-                          {isCertified ? '0% Loss' : `${itemRs.tree_cover_loss_post_2020_ha} ha`}
+                          {notAssessed ? 'No data' : `${itemRs.tree_cover_loss_post_2020_ha} ha`}
                         </span>
                         <span className="block text-[9px] font-mono text-slate-400 mt-1">
-                          {isCertified ? 'EUDR CERTIFIED' : 'REVIEW HOLD'}
+                          {notAssessed ? 'NOT ASSESSED' : isCertified ? 'NO LOSS RECORDED' : 'REVIEW HOLD'}
                         </span>
                       </div>
                     </div>
@@ -501,17 +489,18 @@ export const EudrEngineView: React.FC = () => {
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-2.5">
               <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 font-mono text-[11px] uppercase">
                 <FileCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                EUDR Automated Classification Rules
+                Classification Rules (recorded values only)
               </h4>
               <div className="space-y-2 text-[11px] text-slate-600 dark:text-slate-400">
-                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300">
-                  <span className="font-bold">0% Tree Cover Loss:</span> Automatically marked{' '}
-                  <strong className="underline">EUDR Certified</strong>. Export batches aggregate this plot without audit delays.
+                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300">
+                  <span className="font-bold">No figure recorded:</span> shown as <strong>Not assessed</strong>. This is not a pass.
                 </div>
                 <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-300">
-                  <span className="font-bold">&gt; 0.1 ha Disturbance:</span> Automatically locked in{' '}
-                  <strong className="underline">Compliance Review Hold</strong> with satellite timestamped evidence. Prohibits EU export clearance.
+                  <span className="font-bold">&gt; 0.1 ha recorded loss:</span> placed in <strong className="underline">Compliance Review Hold</strong> for human review.
                 </div>
+                <p className="text-[10px] text-slate-500">
+                  Only values stored on the farmer record are used. No satellite or forest-map source is connected, so nothing here is measured or certified.
+                </p>
               </div>
             </div>
           </div>
@@ -541,167 +530,43 @@ export const EudrEngineView: React.FC = () => {
                 <div className="text-right">
                   <span
                     className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                      rsAnalysis.eudr_compliance_verdict === 'EUDR_CERTIFIED'
-                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                      rsAnalysis.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-600'
                     }`}
                   >
-                    {rsAnalysis.eudr_compliance_verdict === 'EUDR_CERTIFIED' ? (
-                      <ShieldCheck className="w-4 h-4 text-[#1B7F4B]" />
-                    ) : (
+                    {rsAnalysis.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD' && (
                       <AlertTriangle className="w-4 h-4 text-amber-600" />
                     )}
                     <span>{rsAnalysis.eudr_compliance_verdict}</span>
                   </span>
-                  <span className="block text-[11px] font-mono text-slate-500 mt-1">
-                    Risk Score: {rsAnalysis.risk_score} / 100
-                  </span>
                 </div>
               </div>
 
-              {/* Satellite Acquisition & Dec 31, 2020 Forest Intersection Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-[10px] font-mono uppercase text-slate-500">Dec 31, 2020 Forest Baseline</span>
-                  <div className="text-base font-bold text-slate-900 dark:text-white mt-1">
-                    {rsAnalysis.forest_baseline_2020_pct}% <span className="text-xs font-normal text-slate-500">Canopy</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500">Global Forest Watch (GFW)</span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-[10px] font-mono uppercase text-slate-500">Post-2020 Tree Cover Loss</span>
-                  <div
-                    className={`text-base font-bold mt-1 ${
-                      rsAnalysis.tree_cover_loss_post_2020_ha > 0.1
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-[#1B7F4B] dark:text-emerald-400'
-                    }`}
-                  >
-                    {rsAnalysis.tree_cover_loss_post_2020_ha} ha{' '}
-                    <span className="text-xs font-normal text-slate-500">
-                      ({rsAnalysis.tree_cover_loss_pct}%)
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500">
-                    Threshold: &le; 0.10 ha allowed
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                  <span className="text-[10px] font-mono uppercase text-slate-500">Sentinel-2 Pass Date</span>
-                  <div className="text-base font-mono font-bold text-slate-900 dark:text-white mt-1">
-                    {rsAnalysis.copernicus_sentinel.acquisition_date}
-                  </div>
-                  <span className="text-[10px] text-slate-500">
-                    {rsAnalysis.copernicus_sentinel.cloud_cover_pct}% Cloud Cover
-                  </span>
-                </div>
-              </div>
-
-              {/* Spectral NDVI Delta & Remote Sensing Evidence Box */}
-              <div className="p-4 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Satellite className="w-4 h-4 text-cyan-400" />
-                    <span className="text-xs font-mono font-bold text-cyan-300">
-                      {rsAnalysis.copernicus_sentinel.sensor}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    Tile: {rsAnalysis.copernicus_sentinel.tile_id}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono pt-2 border-t border-slate-800">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[10px] text-slate-400">NDVI (2020 Baseline):</span>
-                    <p className="font-bold text-slate-200">{rsAnalysis.copernicus_sentinel.mean_ndvi_2020}</p>
+                    <span className="text-[10px] font-mono uppercase text-slate-500">Recorded post-2020 tree cover loss</span>
+                    <div className="text-base font-bold text-slate-900 dark:text-white mt-1">
+                      {rsAnalysis.tree_cover_loss_post_2020_ha === null
+                        ? 'Not recorded'
+                        : `${rsAnalysis.tree_cover_loss_post_2020_ha} ha${
+                            rsAnalysis.tree_cover_loss_pct !== null ? ` (${rsAnalysis.tree_cover_loss_pct}% of plot)` : ''
+                          }`}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Review threshold: {TREE_COVER_LOSS_THRESHOLD_HA} ha</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400">NDVI (Latest Pass):</span>
-                    <p className="font-bold text-slate-200">{rsAnalysis.copernicus_sentinel.mean_ndvi_current}</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400">NDVI Drop Delta:</span>
-                    <p
-                      className={`font-bold ${
-                        rsAnalysis.copernicus_sentinel.ndvi_drop_delta < -0.1
-                          ? 'text-red-400'
-                          : 'text-emerald-400'
-                      }`}
-                    >
-                      {rsAnalysis.copernicus_sentinel.ndvi_drop_delta > 0 ? '+' : ''}
-                      {rsAnalysis.copernicus_sentinel.ndvi_drop_delta}
-                    </p>
+                    <span className="text-[10px] font-mono uppercase text-slate-500">Basis</span>
+                    <div className="text-base font-bold text-slate-900 dark:text-white mt-1">
+                      {rsAnalysis.basis === 'RECORDED_VALUE' ? 'Stored value' : 'Nothing recorded'}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Cut-off date: {rsAnalysis.baseline_cutoff_date}</span>
                   </div>
                 </div>
-
-                <p className="text-[11px] text-slate-300 leading-relaxed pt-2 border-t border-slate-800">
-                  {rsAnalysis.timestamped_evidence_summary}
+                <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed pt-2 border-t border-slate-200 dark:border-slate-800">
+                  {rsAnalysis.summary}
                 </p>
-
-                {/* Cryptographic Evidence Token */}
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-black/60 border border-slate-800 text-xs font-mono">
-                  <div className="truncate mr-2">
-                    <span className="text-[10px] text-slate-500 block">SATELLITE EVIDENCE HASH:</span>
-                    <span className="text-cyan-400 text-[11px] truncate">
-                      {rsAnalysis.satellite_evidence_sha256}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleCopyEvidenceHash(rsAnalysis.satellite_evidence_sha256)}
-                    className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer transition shrink-0"
-                    title="Copy Evidence Token"
-                  >
-                    {copiedHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Interactive Disturbance Simulator Slider (for testing) */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      Interactive Deforestation / Disturbance Tester
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-500">
-                    Simulate Sentinel-2 Loss Event
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="0"
-                    max="1.5"
-                    step="0.05"
-                    value={simulatedLossHa !== null ? simulatedLossHa : rsAnalysis.tree_cover_loss_post_2020_ha}
-                    onChange={(e) => setSimulatedLossHa(parseFloat(e.target.value))}
-                    className="flex-1 accent-[#1B7F4B] cursor-pointer"
-                  />
-                  <span className="font-mono text-xs font-bold text-slate-900 dark:text-white w-20 text-right">
-                    {(simulatedLossHa !== null ? simulatedLossHa : rsAnalysis.tree_cover_loss_post_2020_ha).toFixed(2)} ha
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-500">
-                    Drag slider &gt; 0.10 ha to verify automated transition into{' '}
-                    <strong className="text-amber-700 dark:text-amber-400 font-mono">COMPLIANCE_REVIEW_HOLD</strong>.
-                  </span>
-                  {simulatedLossHa !== null && (
-                    <button
-                      onClick={() => setSimulatedLossHa(null)}
-                      className="text-xs font-bold text-[#1B7F4B] hover:underline cursor-pointer"
-                    >
-                      Reset to Live Sensor
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -1086,7 +951,7 @@ export const EudrEngineView: React.FC = () => {
               <span className="text-slate-500">
                 Total Area:{' '}
                 <strong className="text-emerald-600 dark:text-emerald-400">
-                  {generatedAnnexII.properties.total_certified_hectares} ha
+                  {generatedAnnexII.properties.total_mapped_hectares} ha
                 </strong>
               </span>
               <span className="text-slate-500">
