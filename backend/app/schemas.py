@@ -45,6 +45,7 @@ class FarmerCreate(BaseModel):
     cooperative: Optional[str] = None
     agent_id: Optional[str] = None
     source: Optional[str] = "agent"
+    created_at_epoch_ms: Optional[int] = None  # device clock when the record was made; used via client_time() in routers/sync.py
 
 class FarmerOut(BaseModel):
     id: str
@@ -86,6 +87,7 @@ class PracticeLogCreate(BaseModel):
     verification_photo_uri: Optional[str] = None
     source: Optional[str] = "agent"
     agent_id: Optional[str] = None
+    created_at_epoch_ms: Optional[int] = None  # device clock when the record was made; used via client_time() in routers/sync.py
 
 class PracticeLogOut(BaseModel):
     id: str
@@ -114,6 +116,7 @@ class BatchCreate(BaseModel):
     aggregation_gps_lng: Optional[float] = None
     farmer_ids: List[str] = []
     farmer_codes: List[str] = []
+    created_at_epoch_ms: Optional[int] = None  # device clock when the record was made; used via client_time() in routers/sync.py
 
 class BatchOut(BaseModel):
     id: str
