@@ -8,8 +8,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:traceharvest_secure_2026@postgres:5432/traceharvest_db
-      - SECRET_KEY=traceharvest_central_secret_key_nigeria_2026
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}@postgres:5432/traceharvest_db
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in backend/.env}
     depends_on:
       - postgres
 
@@ -19,7 +19,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: traceharvest_secure_2026
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}
       POSTGRES_DB: traceharvest_db
     ports:
       - "5432:5432"
