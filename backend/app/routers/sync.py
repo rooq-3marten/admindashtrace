@@ -14,6 +14,19 @@ router = APIRouter(tags=["Synchronization Layer"])
 def now_utc():
     return datetime.now(timezone.utc)
 
+EARLIEST_PLAUSIBLE_MS = 1577836800000   # 2020-01-01 UTC
+MAX_FUTURE_SKEW_MS = 24 * 3600 * 1000   # a device clock more than a day ahead is wrong
+
+def client_time(epoch_ms, now=None):
+    """When the device says a record was created, if that is believable; otherwise the server time.
+    Device clocks can be wrong, so anything before 2020 or more than a day in the future is ignored."""
+    now = now or now_utc()
+    if not isinstance(epoch_ms, int) or isinstance(epoch_ms, bool):
+        return now
+    if epoch_ms < EARLIEST_PLAUSIBLE_MS or epoch_ms > int(now.timestamp() * 1000) + MAX_FUTURE_SKEW_MS:
+        return now
+    return datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc)
+
 # --- Test-data guard ---------------------------------------------------------
 # Load/stress-test records must never reach the production database. A record is
 # treated as test data when its name starts with "Stress Farmer" or it comes from an
@@ -59,7 +72,12 @@ def new_farmer_code(db, state):
             return code
 
 def find_farmers(db, farmer_ids, farmer_codes):
-    """Farmers named by id or by code. "MULTIPLE" is a label from older app versions, not a code."""
+    """
+    Farmers named by id or by code. Returns (farmers_found, ids_not_found).
+    An id that is not found means the farmer has not reached the server yet, so the batch waits.
+    Codes are only a bonus: older app versions send an offline code that can go stale, so a code
+    that matches nothing is ignored. "MULTIPLE" is a label from older app versions, not a code.
+    """
     codes = [c for c in farmer_codes if c and c != "MULTIPLE"]
     found = {}
     if farmer_ids:
@@ -68,9 +86,8 @@ def find_farmers(db, farmer_ids, farmer_codes):
     if codes:
         for farmer in db.query(Farmer).filter(Farmer.farmer_code.in_(codes)).all():
             found[farmer.id] = farmer
-    missing = [c for c in codes if c not in {f.farmer_code for f in found.values()}]
-    missing += [i for i in farmer_ids if i not in found]
-    return list(found.values()), missing
+    missing_ids = [i for i in farmer_ids if i not in found]
+    return list(found.values()), missing_ids
 
 @router.post("/sync/batch", response_model=BulkSyncResponse)
 @router.post("/api/v1/sync/upstream", response_model=BulkSyncResponse)
@@ -176,7 +193,7 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
             gps_polygon = f.gps_polygon,
             enrolled_by_agent_id = agent_id,
             source = f.source or "agent",
-            created_at = now_utc(),
+            created_at = client_time(f.created_at_epoch_ms),
             synced_at = now_utc()
         ))
         db.flush()  # sessions here do not autoflush; later records in this request must find this farmer
@@ -233,7 +250,7 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
             log_date = (datetime.fromtimestamp(p.date_applied_epoch_ms / 1000, tz=timezone.utc) if p.date_applied_epoch_ms else None) or p.log_date or now_utc(),
             source = p.source or "agent",
             agent_id = agent_id,
-            created_at = now_utc(),
+            created_at = client_time(p.created_at_epoch_ms),
             synced_at = now_utc()
         ))
         results.append(saved(client_uuid))
@@ -263,6 +280,13 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
                                    f"Farmer not on the server yet: {', '.join(missing)}."))
             continue
 
+        # Batch codes are unique. Refuse a clash for this one batch rather than failing the whole sync.
+        clash = db.query(Batch).filter(Batch.batch_code == b.batch_code, Batch.id != client_uuid).first()
+        if clash:
+            results.append(refused(client_uuid, "REJECTED_DUPLICATE_CODE",
+                                   f"Batch code {b.batch_code} is already used by another batch."))
+            continue
+
         db.add(Batch(
             id = client_uuid,
             batch_code = b.batch_code,
@@ -272,7 +296,7 @@ def sync_batch(request: BulkSyncRequest, http_request: Request, db: Session = De
             aggregation_gps_lat = b.aggregation_gps_lat,
             aggregation_gps_lng = b.aggregation_gps_lng,
             farmers = farmers,
-            created_at = now_utc(),
+            created_at = client_time(b.created_at_epoch_ms),
             synced_at = now_utc()
         ))
         results.append(saved(client_uuid, client_uuid, b.batch_code))
