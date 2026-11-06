@@ -667,17 +667,15 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({ onSelectFarmer }) =>
                   </span>
                   <span
                     className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${
-                      rsAnalysis?.eudr_compliance_verdict === 'EUDR_CERTIFIED'
-                        ? 'text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-700'
-                        : 'text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 border-amber-200 dark:border-amber-700'
+                      rsAnalysis?.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD'
+                        ? 'text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 border-amber-200 dark:border-amber-700'
+                        : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600'
                     }`}
                   >
-                    {rsAnalysis?.eudr_compliance_verdict === 'EUDR_CERTIFIED' ? (
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                    ) : (
+                    {rsAnalysis?.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD' && (
                       <AlertTriangle className="w-3.5 h-3.5" />
                     )}
-                    <span>{rsAnalysis?.eudr_compliance_verdict || 'EUDR Checked'}</span>
+                    <span>{rsAnalysis?.eudr_compliance_verdict || 'NOT_ASSESSED'}</span>
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-[#111827] dark:text-white mt-1">
@@ -748,22 +746,22 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({ onSelectFarmer }) =>
               {/* EUDR Deforestation Compliance Box */}
               <div
                 className={`p-3.5 rounded-xl border text-xs space-y-2 ${
-                  rsAnalysis?.eudr_compliance_verdict === 'EUDR_CERTIFIED'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
-                    : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60'
+                  rsAnalysis?.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD'
+                    ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60'
+                    : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-semibold text-emerald-800 dark:text-emerald-300">
-                    {rsAnalysis?.eudr_compliance_verdict === 'EUDR_CERTIFIED' ? (
-                      <CheckCircle2 className="w-4 h-4 text-[#1B7F4B] dark:text-emerald-400" />
-                    ) : (
+                    {rsAnalysis?.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD' && (
                       <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     )}
                     <span>
-                      {rsAnalysis?.eudr_compliance_verdict === 'EUDR_CERTIFIED'
-                        ? 'EUDR Certified (0.00 ha Canopy Loss)'
-                        : 'Compliance Review Hold (Disturbance Detected)'}
+                      {rsAnalysis?.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD'
+                        ? 'Compliance Review Hold (recorded loss above threshold)'
+                        : rsAnalysis?.eudr_compliance_verdict === 'NO_LOSS_RECORDED'
+                        ? 'No loss recorded (stored value, not verified)'
+                        : 'Not assessed'}
                     </span>
                   </div>
                   <span className="font-mono text-[10px] text-slate-500">
@@ -771,8 +769,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({ onSelectFarmer }) =>
                   </span>
                 </div>
                 <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-relaxed">
-                  {rsAnalysis?.timestamped_evidence_summary ||
-                    `Geospatial polygon verified against Copernicus Sentinel-2 canopy data.`}
+                  {rsAnalysis?.summary}
                 </p>
                 <div className="text-[10px] font-mono text-[#6B7280] dark:text-slate-400 pt-1 border-t border-emerald-200 dark:border-emerald-900/60 flex justify-between">
                   <span>POSTGIS ST_MAKEVALID:</span>
