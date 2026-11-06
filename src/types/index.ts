@@ -28,7 +28,7 @@ export interface Farmer {
   created_at_epoch_ms: number;
   synced_at?: number;
   eudr_compliant?: boolean;
-  eudr_status?: 'EUDR_CERTIFIED' | 'COMPLIANCE_REVIEW_HOLD';
+  eudr_status?: 'NOT_ASSESSED' | 'NO_LOSS_RECORDED' | 'COMPLIANCE_REVIEW_HOLD';
   tree_cover_loss_post_2020_ha?: number;
   tree_cover_baseline_2020_pct?: number;
   eudr_risk_score?: number;
@@ -75,32 +75,28 @@ export interface EudrOverlapReport {
   resolution_status: 'DISPUTE_RISK' | 'CLEARED' | 'MUTUALLY_AGREED';
 }
 
+/**
+ * Outcome of the deforestation check for one plot.
+ * NOT_ASSESSED: no tree-cover-loss figure has been recorded for this plot. This is NOT a pass.
+ * NO_LOSS_RECORDED: a recorded figure is at or under the 0.1 ha review threshold (a record, not a certification).
+ * COMPLIANCE_REVIEW_HOLD: a recorded figure is above the threshold.
+ */
+export type EudrVerdict = 'NOT_ASSESSED' | 'NO_LOSS_RECORDED' | 'COMPLIANCE_REVIEW_HOLD';
+
 export interface EudrRemoteSensingAnalysis {
   farmer_id: string;
   farmer_name: string;
   commodity: string;
   country: string;
   administrative_region: string;
-  farm_size_hectares: number;
+  farm_size_hectares: number | null;
   baseline_cutoff_date: '2020-12-31';
-  forest_baseline_2020_pct: number;
-  current_tree_cover_pct: number;
-  tree_cover_loss_post_2020_ha: number;
-  tree_cover_loss_pct: number;
-  canopy_status: '0%_LOSS_EUDR_CERTIFIED' | 'DISTURBANCE_REVIEW_HOLD';
-  eudr_compliance_verdict: 'EUDR_CERTIFIED' | 'COMPLIANCE_REVIEW_HOLD';
-  risk_score: number; // 0 = Certified, >0 = Hold
-  copernicus_sentinel: {
-    sensor: string;
-    tile_id: string;
-    acquisition_date: string;
-    cloud_cover_pct: number;
-    mean_ndvi_2020: number;
-    mean_ndvi_current: number;
-    ndvi_drop_delta: number;
-  };
-  satellite_evidence_sha256: string;
-  timestamped_evidence_summary: string;
+  /** RECORDED_VALUE = taken from the farmer record; NOT_ASSESSED = nothing recorded. No satellite data is read by this dashboard. */
+  basis: 'RECORDED_VALUE' | 'NOT_ASSESSED';
+  tree_cover_loss_post_2020_ha: number | null;
+  tree_cover_loss_pct: number | null;
+  eudr_compliance_verdict: EudrVerdict;
+  summary: string;
 }
 
 export interface EudrAnnexIIProperties {
@@ -114,7 +110,7 @@ export interface EudrAnnexIIProperties {
   cutoff_date?: string;
   generation_timestamp?: string;
   total_plots_count?: number;
-  total_certified_hectares?: number;
+  total_mapped_hectares?: number;
 }
 
 export interface EudrAnnexIIFeature {
@@ -131,15 +127,10 @@ export interface EudrAnnexIIFeature {
     country_of_production: string;
     administrative_region: string;
     farm_size_hectares: number;
-    eudr_compliance_status: 'EUDR_CERTIFIED' | 'COMPLIANCE_REVIEW_HOLD';
-    tree_cover_loss_post_2020_ha: number;
-    tree_cover_baseline_2020_pct: number;
-    current_tree_cover_pct: number;
-    sentinel2_acquisition_date: string;
-    sentinel2_tile_id: string;
+    eudr_assessment_status: EudrVerdict;
+    tree_cover_loss_post_2020_ha: number | null;
     postgis_topology_status: string;
     neighbor_overlap_detected: boolean;
-    tamper_proof_evidence_sha256: string;
   };
 }
 
