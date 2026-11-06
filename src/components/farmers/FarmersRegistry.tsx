@@ -247,7 +247,7 @@ export const FarmersRegistry: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB] dark:divide-[#334155] text-[#111827] dark:text-[#F1F5F9]">
-              {filteredFarmers.map((farmer, idx) => {
+              {filteredFarmers.map((farmer) => {
                 const isSelected = selectedUuids.includes(farmer.client_uuid);
                 const farmerPractices = getFarmerPractices(farmer.client_uuid);
                 const hasFlags = farmerPractices.some((p) => p.risk_level === 'FLAGGED_HIGH_RISK');
@@ -269,7 +269,7 @@ export const FarmersRegistry: React.FC = () => {
                       />
                     </td>
                     <td className="py-3.5 px-4 font-mono font-semibold text-[#111827] dark:text-[#F1F5F9]">
-                      {farmer.official_farmer_id || `TH-KAN-2026-0048${idx}`}
+                      {farmer.official_farmer_id || <span className="font-sans font-normal text-[#6B7280]">Not issued yet</span>}
                     </td>
                     <td className="py-3.5 px-4 font-medium">
                       {farmer.full_name}
@@ -278,19 +278,21 @@ export const FarmersRegistry: React.FC = () => {
                       {farmer.crop}
                     </td>
                     <td className="py-3.5 px-4 font-mono font-medium">
-                      {farmer.client_uuid.includes('550e') ? 3 : (idx % 3) + 1}
+                      {farmer.total_plots_count ?? '—'}
                     </td>
                     <td className="py-3.5 px-4 text-[#6B7280] dark:text-[#94A3B8]">
-                      {farmer.agent_id === 'AGENT-NG-042' ? 'Musa I.' : farmer.agent_id === 'AGENT-NG-018' ? 'Fatima S.' : 'John O.'}
+                      {agents.find((a) => a.agent_id === farmer.agent_id)?.name ?? farmer.agent_id ?? '—'}
                     </td>
                     <td className="py-3.5 px-4">
                       {hasFlags ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#F59E0B]">
                           ⚠️ Flagged
                         </span>
+                      ) : farmerPractices.length === 0 ? (
+                        <span className="text-[11px] text-[#6B7280] dark:text-[#94A3B8]">No practices logged</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#16A34A]">
-                          ● Validated
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B7280] dark:text-[#94A3B8]">
+                          No flags raised
                         </span>
                       )}
                     </td>
