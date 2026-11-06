@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { useData } from '../../context/DataContext';
-import { apiFetch } from '../../lib/apiFetch';
 import {
   Radio,
   Smartphone,
@@ -45,8 +44,6 @@ export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) =
 
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [downstreamData, setDownstreamData] = useState<any>(null);
-  const [isLoadingDownstream, setIsLoadingDownstream] = useState(false);
 
   const onlineAgentsCount = agents.filter((a) => a.active_status === 'online' || a.active_status === 'syncing').length;
 
@@ -59,7 +56,6 @@ export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) =
         traceharvest_pairing_v1: true,
         gateway_url: currentOrigin,
         upstream: `${currentOrigin}/api/v1/sync/upstream`,
-        downstream: `${currentOrigin}/api/v1/sync/downstream`,
         ping: `${currentOrigin}/api/v1/sync/ping`,
       }),
       {
@@ -74,21 +70,6 @@ export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) =
       .then((url) => setQrCodeUrl(url))
       .catch((err) => console.warn('QR code generation error:', err));
   }, [currentOrigin]);
-
-  const handleFetchDownstream = async () => {
-    setIsLoadingDownstream(true);
-    try {
-      const res = await apiFetch('/api/v1/sync/downstream?agent_id=AGENT-NG-042');
-      if (res.ok) {
-        const data = await res.json();
-        setDownstreamData(data);
-      }
-    } catch (err) {
-      console.warn('Downstream fetch error:', err);
-    } finally {
-      setIsLoadingDownstream(false);
-    }
-  };
 
   const copyConfigUrl = () => {
     navigator.clipboard.writeText(configUrl);
@@ -259,76 +240,6 @@ export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) =
           </div>
         </div>
 
-        {/* Downstream Sync & Regulatory Reference Inspector */}
-        <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#E5E7EB] dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase text-blue-600 dark:text-blue-400">
-                <Database className="w-4 h-4" /> Downstream Sync Stream
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-mono">
-                GET /api/v1/sync/downstream
-              </span>
-            </div>
-            <h3 className="text-base font-bold text-[#111827] dark:text-white">Regulatory Agrochemical & Smallholder Directory</h3>
-            <p className="text-xs text-[#6B7280] dark:text-slate-400 mt-1">
-              Field agents pull this catalog to inspect NAFDAC registration numbers, MRL clearance thresholds, and EUDR geofences offline.
-            </p>
-          </div>
-
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800">
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-500 font-mono">APPROVED CHEMICALS</span>
-              <p className="text-base font-bold text-[#1B7F4B] dark:text-emerald-400 font-mono">6 Products</p>
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-400">NAFDAC Certified</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800">
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-500 font-mono">BANNED CHEMICALS</span>
-              <p className="text-base font-bold text-red-600 dark:text-red-400 font-mono">6 Prohibited</p>
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-400">EU Annex II Blacklist</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800">
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-500 font-mono">SYNC STATUS</span>
-              <p className="text-base font-bold text-teal-600 dark:text-teal-300 font-mono">Real-time</p>
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-400">Live Polling Active</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800">
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-500 font-mono">ACTIVE AGENTS</span>
-              <p className="text-base font-bold text-blue-600 dark:text-blue-400 font-mono">{agents.length} Online</p>
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-400">Northern Corridors</span>
-            </div>
-          </div>
-
-          {/* Downstream Data Inspector */}
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#111827] dark:text-slate-300 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-[#1B7F4B] dark:text-emerald-400" />
-                Live Downstream Payload Preview
-              </span>
-              <button
-                onClick={handleFetchDownstream}
-                disabled={isLoadingDownstream}
-                className="flex items-center gap-1.5 text-xs text-[#1B7F4B] dark:text-emerald-400 hover:underline font-mono cursor-pointer"
-              >
-                <RefreshCw className={`w-3 h-3 ${isLoadingDownstream ? 'animate-spin' : ''}`} />
-                {isLoadingDownstream ? 'Pulling...' : 'Test Pull Downstream'}
-              </button>
-            </div>
-
-            <div className="h-32 overflow-y-auto font-mono text-[11px] text-[#111827] dark:text-slate-400 p-2.5 rounded-lg bg-white dark:bg-black/40 border border-[#E5E7EB] dark:border-slate-800">
-              {downstreamData ? (
-                <pre>{JSON.stringify(downstreamData, null, 2)}</pre>
-              ) : (
-                <div className="text-[#6B7280] dark:text-slate-500 flex flex-col items-center justify-center h-full">
-                  <span>Click "Test Pull Downstream" to inspect the JSON payload delivered to field devices.</span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">Endpoint: /api/v1/sync/downstream?agent_id=AGENT-NG-042</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Upstream Sync Telemetry Audit Table */}
