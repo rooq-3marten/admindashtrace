@@ -253,12 +253,12 @@ val syncPayload = AgentBatchSyncRequest(
             </div>
 
             <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-[#E5E7EB] dark:border-slate-800">
-              <span className="text-[10px] text-[#6B7280] dark:text-slate-400 block font-sans">DOWNSTREAM CACHE</span>
+              <span className="text-[10px] text-[#6B7280] dark:text-slate-400 block font-sans">SYNC RECORDS</span>
               <p className="font-bold text-sm text-[#111827] dark:text-white">
-                {connectionReport ? `${connectionReport.downstream_cache.record_count} Records` : (isCheckingStrength ? 'Fetching Catalog...' : 'Pending Query')}
+                {connectionReport ? `${connectionReport.downstream_cache.record_count} Records` : (isCheckingStrength ? 'Reading...' : 'Pending Query')}
               </p>
               <span className="text-[10px] text-[#6B7280] dark:text-slate-400 font-sans">
-                {connectionReport?.downstream_cache.reachable ? `${connectionReport.downstream_cache.latency_ms}ms round-trip` : 'Catalog /sync/downstream'}
+                {connectionReport?.downstream_cache.reachable ? `${connectionReport.downstream_cache.latency_ms}ms round-trip` : '/sync/status'}
               </span>
             </div>
 
@@ -377,13 +377,6 @@ interface TraceHarvestSyncApi {
         @Part("entity_id") entityId: RequestBody,
         @Part file: MultipartBody.Part
     ): Response<DocumentUploadResponse>
-
-    // 3. Downstream: Download approved chemicals, verified regulatory documents & assigned farmers
-    @GET("api/v1/sync/downstream")
-    suspend fun fetchDownstreamCatalog(
-        @Query("agent_id") agentId: String,
-        @Query("since_epoch_ms") sinceMs: Long = 0
-    ): Response<DownstreamSyncResponse>
 
     // 4. Heartbeat & Ping
     @GET("api/v1/sync/ping")
