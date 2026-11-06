@@ -59,14 +59,6 @@ export const DocumentExpirySentinelView: React.FC = () => {
   // Trigger manual cron evaluation
   const handleTriggerCronNow = async () => {
     setIsRunningCron(true);
-    try {
-      apiFetch('/api/v1/sentinel/cron-trigger', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ triggered_by: 'web_admin', cron_expression: cronExpression }),
-      }).catch(() => {});
-    } catch (_) {}
-
     setTimeout(() => {
       const log = executeSentinelCronScan(documents, batches, shipments, cronExpression);
       setLastCronLog(log);
