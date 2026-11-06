@@ -685,20 +685,20 @@ export const Header: React.FC<HeaderProps> = ({
                   </p>
                 </div>
 
-                {/* 2. Downstream Cache */}
+                {/* 2. Sync Records */}
                 <div className="p-3.5 rounded-xl border border-[#E5E7EB] dark:border-[#334155] bg-white dark:bg-slate-900 space-y-2">
                   <div className="flex items-center justify-between text-[#6B7280] dark:text-slate-400">
-                    <span className="font-semibold text-[11px] uppercase font-mono">2. Downstream Cache</span>
+                    <span className="font-semibold text-[11px] uppercase font-mono">2. Sync Records</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   </div>
                   <div>
-                    <span className="text-xs text-[#6B7280] dark:text-slate-400">Verified Payload:</span>
+                    <span className="text-xs text-[#6B7280] dark:text-slate-400">Records on server:</span>
                     <p className="text-sm font-bold font-mono text-[#111827] dark:text-white">
                       {connectionReport?.downstream_cache.record_count ?? farmers.length} Records
                     </p>
                   </div>
                   <p className="text-[11px] text-[#6B7280] dark:text-slate-400 truncate font-mono">
-                    /api/v1/sync/downstream
+                    /api/v1/sync/status
                   </p>
                 </div>
 
