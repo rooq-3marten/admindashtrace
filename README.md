@@ -142,6 +142,6 @@ npm run build
 
 ## 🔒 Security & Data Integrity Safeguards
 
-* **Zero Test Farmers in Production**: The codebase, seed data, and verification sentinel enforce strict separation between test scripts and production data.
+* **No sample data**: the dashboard ships with no demo or seed records. Every figure comes from the live backend or from records the signed-in user creates.
 * **Row-Level Security (RLS)**: Enforced both at the PostgreSQL schema layer and within Express server middleware.
 * **Client Key Isolation**: Server keys are never exposed to browser bundles.
