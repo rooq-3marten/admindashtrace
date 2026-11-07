@@ -4,7 +4,6 @@ import { TabType } from '../layout/Sidebar';
 
 interface AnalyticsDashboardProps {
   setActiveTab: (tab: TabType) => void;
-  onOpenSimulator: () => void;
 }
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
