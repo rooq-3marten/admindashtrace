@@ -35,7 +35,6 @@ import { PendingAgentsView } from './components/admin/PendingAgentsView';
 import { ExportersView } from './components/users/ExportersView';
 import { ReportsView } from './components/analytics/ReportsView';
 import { ExportsView } from './components/analytics/ExportsView';
-import { MobileSyncSimulator } from './components/simulator/MobileSyncSimulator';
 import { DocumentExpirySentinelView } from './components/compliance/DocumentExpirySentinelView';
 import { LandingPage } from './components/landing/LandingPage';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -100,7 +99,6 @@ interface MainAppProps {
 }
 
 function MainApp({ activeTab, setActiveTab }: MainAppProps) {
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [quotaExceeded, setQuotaExceeded] = useState<boolean>(false);
 
@@ -140,7 +138,6 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenSimulator={() => setIsSimulatorOpen(true)}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
       />
 
@@ -160,7 +157,6 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
             {activeTab === 'dashboard' && (
               <AnalyticsDashboard
                 setActiveTab={setActiveTab}
-                onOpenSimulator={() => setIsSimulatorOpen(true)}
               />
             )}
 
@@ -217,7 +213,7 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
             )}
 
             {activeTab === 'fleet' && (
-              <FleetMonitor onOpenSimulator={() => setIsSimulatorOpen(true)} />
+              <FleetMonitor />
             )}
 
             {activeTab === 'system_health' && (
@@ -251,14 +247,6 @@ function MainApp({ activeTab, setActiveTab }: MainAppProps) {
         </main>
       </div>
 
-      {/* Android Field Sync Simulator Modal - Rule 3: Disabled unless VITE_ENABLE_SIMULATOR is true */}
-      {import.meta.env.VITE_ENABLE_SIMULATOR === 'true' && (
-        <MobileSyncSimulator
-          isOpen={isSimulatorOpen}
-          onClose={() => setIsSimulatorOpen(false)}
-          onNavigateToDocuments={() => setActiveTab('documents')}
-        />
-      )}
     </div>
   );
 }
