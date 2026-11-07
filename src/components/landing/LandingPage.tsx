@@ -117,7 +117,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
                 Prevent export rejections with compliance data
               </h4>
               <p className="text-xs text-white/70 mt-0.5 leading-relaxed">
-                Automated NAFDAC Pre-Harvest Interval (PHI) count and Copernicus Sentinel-2 EUDR Annex II deforestation due diligence.
+                NAFDAC pre-harvest interval tracking and EUDR Annex II plot-boundary export, with review of any recorded tree-cover loss.
               </p>
             </div>
           </div>
@@ -322,7 +322,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
                   <strong>1. Farmer Data Protection:</strong> Personal records, phone numbers, and landholding coordinates for smallholder farmers across Kano, Benue, and Jigawa are secured with access control and restricted to statutory export certification.
                 </p>
                 <p>
-                  <strong>2. Satellite Geospatial Verification:</strong> Farm coordinates are verified against Copernicus Sentinel-2 multispectral baseline data solely to substantiate deforestation-free provenance.
+                  <strong>2. Geospatial Data:</strong> Farm coordinates and boundaries are used to build plot geometry for EU deforestation due diligence (EUDR Annex II) and to detect overlapping claims. No automated satellite verification is performed.
                 </p>
                 <p>
                   <strong>3. Retention & Audit Logs:</strong> All field synchronizations, weighbridge manifests, and pesticide compliance decisions are retained for statutory customs audit trails.
