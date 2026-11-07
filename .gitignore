@@ -7,3 +7,4 @@ coverage/
 .env*
 !.env.example
 .gmp_cache/
+data_store.json
