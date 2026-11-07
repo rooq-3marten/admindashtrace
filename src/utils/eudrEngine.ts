@@ -4,7 +4,7 @@
  * Implements:
  * 1. PostGIS ST_MakeValid(ST_GeomFromText(polygon)) geometry topology cleaning & self-intersection repair
  * 2. Automated neighboring smallholder boundary overlap detection (land disputes & double-claim prevention)
- * 3. Automated Copernicus Sentinel-2 & Global Forest Watch (GFW) Dec 31, 2020 forest baseline tree-cover validation
+ * 3. Review of recorded post-2020 tree-cover loss (no satellite source connected; unrecorded plots are NOT_ASSESSED)
  * 4. Official European Commission EUDR Annex II GeoJSON export engine (Regulation (EU) 2023/1115)
  */
 
