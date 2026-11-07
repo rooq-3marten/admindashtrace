@@ -35,14 +35,12 @@ import {
 interface HeaderProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
-  onOpenSimulator: () => void;
   onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
-  onOpenSimulator,
   onToggleMobileMenu,
 }) => {
   const { userProfile, role, switchRole, signInWithGoogle, signOut, currentUser } = useAuth();
@@ -430,18 +428,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="pt-1 space-y-1">
-                  {import.meta.env.VITE_ENABLE_SIMULATOR === 'true' && (
-                    <button
-                      onClick={() => {
-                        onOpenSimulator();
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#1A2E23] dark:text-[#E8F0EA] hover:bg-[#F7F9F7] dark:hover:bg-[#14261C] transition cursor-pointer"
-                    >
-                      <Smartphone className="w-3.5 h-3.5 text-[#1A4D2E]" />
-                      Test Field Agent Sync
-                    </button>
-                  )}
 
                   <button
                     onClick={() => {
