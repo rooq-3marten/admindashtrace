@@ -24,11 +24,7 @@ import {
   Activity,
 } from 'lucide-react';
 
-interface FleetMonitorProps {
-  onOpenSimulator: () => void;
-}
-
-export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) => {
+export const FleetMonitor: React.FC = () => {
   const {
     agents,
     syncLogs,
@@ -94,15 +90,6 @@ export const FleetMonitor: React.FC<FleetMonitorProps> = ({ onOpenSimulator }) =
           </p>
         </div>
 
-        {import.meta.env.VITE_ENABLE_SIMULATOR === 'true' && (
-          <button
-            onClick={onOpenSimulator}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1B7F4B] hover:bg-[#145C36] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-          >
-            <Smartphone className="w-4 h-4" />
-            Test Field Agent Sync
-          </button>
-        )}
       </div>
 
       {/* Agents Roster Grid */}
