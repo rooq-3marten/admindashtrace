@@ -168,7 +168,6 @@ RETURNS BOOLEAN AS $$
 BEGIN
     RETURN (
         current_setting('request.jwt.claim.role', true) IN ('admin', 'super_admin', 'compliance_officer')
-        OR current_setting('request.jwt.claim.email', true) = 'admin@traceharvest.ng'
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
