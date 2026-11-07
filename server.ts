@@ -309,7 +309,7 @@ function sanitizeAgent(agent: any) {
 // Consumed by Android Agent App via WorkManager and Web Simulator
 // ==============================================================
 app.post(['/sync/batch', '/api/v1/sync/upstream'], (req: Request, res: Response) => {
-  const { agent_id = 'AGENT-NG-042', device_id, device_timestamp_ms, farmers = [], practices = [], batches = [], documents = [] } = req.body;
+  const { agent_id = 'UNASSIGNED', device_id, device_timestamp_ms, farmers = [], practices = [], batches = [], documents = [] } = req.body;
 
   // STRICT SECURITY CHECK: Block non-approved agents from bulk syncing
   const callingAgent = db.agents?.[agent_id] || Object.values(db.agents || {}).find((a: any) => a.id === agent_id || a.agent_id === agent_id || a.email === agent_id);
@@ -1429,8 +1429,8 @@ app.post(['/farmers', '/api/v1/farmers'], (req: Request, res: Response) => {
     crop_type: payload.crop || payload.crop_type || 'Sesame',
     crop: payload.crop || payload.crop_type || 'Sesame',
     cooperative: payload.cooperative_name || payload.cooperative || null,
-    enrolled_by_agent_id: payload.agent_id || 'AGENT-NG-042',
-    agent_id: payload.agent_id || 'AGENT-NG-042',
+    enrolled_by_agent_id: payload.agent_id || 'UNASSIGNED',
+    agent_id: payload.agent_id || 'UNASSIGNED',
     source: payload.source || 'agent',
     created_at: new Date().toISOString(),
     synced_at: new Date().toISOString(),
@@ -1446,7 +1446,7 @@ app.post(['/farmers', '/api/v1/farmers'], (req: Request, res: Response) => {
 
   const syncEvent = {
     id: (db.syncEvents?.length || 0) + 1,
-    agent_id: payload.agent_id || 'AGENT-NG-042',
+    agent_id: payload.agent_id || 'UNASSIGNED',
     device_id: payload.device_id || 'samsung-sm-a145f',
     event_type: 'PUSH',
     entity_type: 'FARMER',
@@ -1523,7 +1523,7 @@ app.post(['/practice-logs', '/api/v1/practice-logs'], (req: Request, res: Respon
     quantity_unit: payload.quantity_unit || 'ml',
     log_date: new Date(appliedMs).toISOString(),
     source: payload.source || 'agent',
-    agent_id: payload.agent_id || 'AGENT-NG-042',
+    agent_id: payload.agent_id || 'UNASSIGNED',
     risk_level: isBanned ? 'FLAGGED_HIGH_RISK' : (payload.risk_level || 'COMPLIANT'),
     nafdac_approved: isBanned ? false : (payload.nafdac_approved ?? true),
     phi_cleared: isPhiCleared,
@@ -1542,7 +1542,7 @@ app.post(['/practice-logs', '/api/v1/practice-logs'], (req: Request, res: Respon
 
   const syncEvent = {
     id: (db.syncEvents?.length || 0) + 1,
-    agent_id: payload.agent_id || 'AGENT-NG-042',
+    agent_id: payload.agent_id || 'UNASSIGNED',
     device_id: payload.device_id || 'samsung-sm-a145f',
     event_type: 'PUSH',
     entity_type: 'PRACTICE_LOG',
@@ -1590,7 +1590,7 @@ app.post(['/batches', '/api/v1/batches'], (req: Request, res: Response) => {
     client_uuid: batchId,
     batch_code: batchCode,
     batch_number: batchCode,
-    agent_id: payload.agent_id || 'AGENT-NG-042',
+    agent_id: payload.agent_id || 'UNASSIGNED',
     total_quantity: parseFloat(payload.total_quantity) || 20.0,
     estimated_tonnage: parseFloat(payload.total_quantity) || 20.0,
     quality_grade: payload.quality_grade || 'Grade A Export Ready',
@@ -1733,7 +1733,7 @@ app.get(['/admin/batches', '/api/v1/admin/batches'], (req: Request, res: Respons
   const batchList = db.batches.map((b) => ({
     id: b.id || b.batch_code,
     batch_code: b.batch_code || b.batch_number,
-    agent_id: b.agent_id || 'AGENT-NG-042',
+    agent_id: b.agent_id || 'UNASSIGNED',
     total_quantity: b.total_quantity || b.estimated_tonnage || 20.0,
     quality_grade: b.quality_grade || 'Grade A Export Ready',
     aggregation_gps_lat: b.aggregation_gps_lat || 12.4382,
@@ -2375,7 +2375,7 @@ app.post('/api/v1/eudr/analyze-remote-sensing', (req: Request, res: Response) =>
 
 // 4. Official EUDR Annex II GeoJSON Export Endpoint (European Commission Specification)
 app.get('/api/v1/eudr/export-annex-ii', (req: Request, res: Response) => {
-  const { commodity = 'Sesame', country = 'NGA', dds_id = 'DDS-2026-90412', download } = req.query as Record<string, string>;
+  const { commodity = 'Sesame', country = 'NGA', dds_id = '', download } = req.query as Record<string, string>;
 
   let farmersList = Object.values(db.farmers);
   if (commodity && commodity !== 'ALL') {
@@ -2430,8 +2430,8 @@ app.get('/api/v1/eudr/export-annex-ii', (req: Request, res: Response) => {
       country_of_production: country,
       eudr_due_diligence_id: dds_id,
       operator_name: 'TraceHarvest Export Logistics & Commodities Ltd',
-      operator_eori: 'NL847291038',
-      export_batch_id: 'EXP-TH-2026-BATCH-402',
+      operator_eori: '',
+      export_batch_id: '',
       regulation_standard: 'Regulation (EU) 2023/1115 Annex II',
       forest_cutoff_date: '2020-12-31T23:59:59Z',
       generation_timestamp: new Date().toISOString(),
@@ -2501,23 +2501,15 @@ function runServerSentinelCronScan() {
   const nowMs = Date.now();
   const alerts: SentinelCronAlert[] = [];
 
-  const voyages: Record<string, { vessel: string; container: string; destination: string; eta: string }> = {
-    'EXP-TH-2026-9042': { vessel: 'CMA CGM Africa One', container: 'MSCU-904128-4', destination: 'Rotterdam, Netherlands (EU)', eta: '2026-10-14' },
-    'NG-SES-2026-0042-EXP': { vessel: 'CMA CGM Africa One', container: 'MSCU-904128-4', destination: 'Rotterdam, Netherlands (EU)', eta: '2026-10-14' },
-    'EXP-TH-2026-4419': { vessel: 'Maersk Cadiz', container: 'HLCU-312984-0', destination: 'Hamburg, Germany (EU)', eta: '2026-10-18' },
-    'EXP-TH-2026-1182': { vessel: 'MSC Sahara', container: 'MSCU-552190-2', destination: 'London Gateway, UK', eta: '2026-10-22' },
-  };
+  // No voyage data is stored on this legacy server, so there is nothing to compare certificate expiry against.
+  const voyages: Record<string, { vessel: string; container: string; destination: string; eta: string }> = {};
 
   for (const doc of targetDocs) {
-    const batchKey = doc.entity_id || 'EXP-TH-2026-9042';
-    const voyage = voyages[batchKey] || voyages['EXP-TH-2026-9042'];
-    const etaMs = Date.parse(voyage.eta) || nowMs + 10 * 86400000;
-
-    let expStr = doc.expiry_date;
-    if (!expStr) {
-      expStr = doc.category === 'PHYTOSANITARY' ? '2026-10-24' : '2026-10-20';
-    }
-    const expMs = Date.parse(expStr) || etaMs + 6 * 86400000;
+    const voyage = voyages[doc.entity_id];
+    const expStr = doc.expiry_date;
+    if (!voyage || !expStr || !Date.parse(voyage.eta) || !Date.parse(expStr)) continue;
+    const etaMs = Date.parse(voyage.eta);
+    const expMs = Date.parse(expStr);
     const daysFromEta = Math.round((expMs - etaMs) / 86400000);
 
     let riskLevel: 'CRITICAL_EXPIRED_BEFORE_ETA' | 'FLAGGED_EXPIRING_WITHIN_14_DAYS' | 'COMPLIANT_SAFE_MARGIN' = 'COMPLIANT_SAFE_MARGIN';
@@ -2587,36 +2579,6 @@ app.post(['/sentinel/cron-trigger', '/api/v1/sentinel/cron-trigger'], (req: Requ
     message: 'Automated Document Expiry Sentinel cron triggered successfully',
     execution: lastSentinelExecution,
   });
-});
-
-// Single-Window Audit Dossier Summary Endpoint
-app.get(['/batches/:batchNumber/dossier', '/api/v1/batches/:batchNumber/dossier'], (req: Request, res: Response) => {
-  const { batchNumber } = req.params;
-  const batch = (db.batches || []).find((b: any) => b.batch_number === batchNumber) || {
-    batch_number: batchNumber,
-    crop: 'Sesame',
-    destination: 'Rotterdam, Netherlands (EU)',
-    estimated_tonnage: 42.5,
-    tamper_proof_sha256: crypto.createHash('sha256').update(batchNumber).digest('hex'),
-  };
-
-  const dossierManifest = {
-    consignment_lot: batch.batch_number,
-    destination: batch.destination,
-    customs_entry_point: 'Rotterdam Maasvlakte / Hamburg Waltershof (Single-Window)',
-    audit_dossier_contents: [
-      { id: 1, title: 'Official Phytosanitary Certificate (NAQS)', format: 'PDF', status: 'VERIFIED' },
-      { id: 2, title: 'Laboratory Gas-Chromatography MRL Report (SGS/NAFDAC)', format: 'PDF', status: 'VERIFIED' },
-      { id: 3, title: 'EUDR Due Diligence Statement (Annex II GeoJSON + Vector Polygons Map)', format: 'JSON+PDF', status: 'VERIFIED' },
-      { id: 4, title: 'Marine Bill of Lading & Container ISO 17712 Bolt Seal Verification', format: 'PDF', status: 'VERIFIED' },
-      { id: 5, title: 'Cryptographic SHA-256 Chain Verification Manifest', format: 'JSON', status: 'VERIFIED' },
-    ],
-    tamper_proof_sha256: batch.tamper_proof_sha256,
-    digital_signature: `ECDSA_P256_${batch.tamper_proof_sha256.substring(0, 24)}`,
-    generated_at: new Date().toISOString(),
-  };
-
-  res.json(dossierManifest);
 });
 
 // ==============================================================
