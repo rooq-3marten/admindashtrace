@@ -421,7 +421,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({ onSelectFarmer }) =>
               </span>
             </div>
             <p className="text-xs text-[#6B7280] dark:text-slate-400">
-              High-resolution satellite and aerial imagery with precision smallholder boundary polygons and EUDR 2020 canopy validation
+              High-resolution satellite and aerial imagery with precision smallholder boundary polygons and review of recorded tree-cover loss
             </p>
           </div>
         </div>
@@ -549,7 +549,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({ onSelectFarmer }) =>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-800">
               <Trees className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Copernicus Sentinel-2 Dec 31, 2020 Cutoff Reference</span>
+              <span>EUDR cut-off date: 31 Dec 2020</span>
             </div>
           </div>
 
