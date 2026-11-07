@@ -42,7 +42,7 @@ export const MobileIntegrationGuide: React.FC = () => {
   -H "Content-Type: application/json" \\
   -H "User-Agent: TraceHarvest-Android/1.0" \\
   -d '{
-    "agent_id": "AGENT-NG-042",
+    "agent_id": "<your-agent-id>",
     "device_timestamp_ms": ${Date.now()},
     "farmers": [
       {
@@ -58,7 +58,7 @@ export const MobileIntegrationGuide: React.FC = () => {
         "longitude": 8.5147,
         "gps_polygon": "12.4374,8.5131;12.4374,8.5163;12.4342,8.5163;12.4342,8.5131",
         "cooperative_name": "Dambatta Sesame Growers Union",
-        "agent_id": "AGENT-NG-042",
+        "agent_id": "<your-agent-id>",
         "created_at_epoch_ms": ${Date.now() - 3600000}
       }
     ],
@@ -79,7 +79,7 @@ export const MobileIntegrationGuide: React.FC = () => {
         "nafdac_approved": true,
         "gps_coordinates": "12.4382°N, 8.5147°E",
         "risk_level": "COMPLIANT",
-        "agent_id": "AGENT-NG-042"
+        "agent_id": "<your-agent-id>"
       }
     ],
     "documents": [
@@ -97,7 +97,7 @@ export const MobileIntegrationGuide: React.FC = () => {
         "certificate_number": "NIN-2026-90412",
         "issue_date": "2026-09-18",
         "verification_status": "PENDING_REVIEW",
-        "uploaded_by": "AGENT-NG-042",
+        "uploaded_by": "<your-agent-id>",
         "uploader_source": "mobile_agent"
       }
     ]
