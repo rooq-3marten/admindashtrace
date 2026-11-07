@@ -14,7 +14,6 @@ import {
 } from '@phosphor-icons/react';
 import { AuditDossierModal } from './AuditDossierModal';
 import { evaluateDocumentEtaRisks } from '../../utils/documentExpirySentinel';
-import { generateBillOfLadingPdf, downloadFile } from '../../utils/auditDossierGenerator';
 
 export const ShipmentsView: React.FC = () => {
   const { shipments, batches, documents } = useData();
@@ -235,14 +234,11 @@ export const ShipmentsView: React.FC = () => {
               <div className="p-4 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536] space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#1A2E23] dark:text-white">
-                    European Port Clearance Package
-                  </span>
-                  <span className="text-[11px] font-mono text-[#2D6A4F] dark:text-[#86EFAC]">
-                    Customs Verified
+                    Batch Evidence Pack
                   </span>
                 </div>
                 <p className="text-[11px] text-[#5A6B60] dark:text-[#A1B3A7] leading-relaxed">
-                  Generates bundled archive including official Clean Ocean Bill of Lading, mechanical seal verification, and lab chromatography reports.
+                  Bundles the batch summary, plot boundaries and any uploaded certificates, lab reports and bill of lading, with checksums.
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -253,19 +249,7 @@ export const ShipmentsView: React.FC = () => {
                     className="flex-1 py-2 px-3 rounded-lg bg-[#1A4D2E] hover:bg-[#0F3320] text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-warm-card"
                   >
                     <Package size={15} />
-                    <span>Download Full Dossier (.ZIP)</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      const batch = getBatchForShipment(selectedShipment);
-                      const pdf = generateBillOfLadingPdf(batch, selectedShipment);
-                      downloadFile(pdf, `Bill_of_Lading_${selectedShipment.shipment_code}.pdf`, 'application/pdf');
-                    }}
-                    className="py-2 px-3 rounded-lg border border-[#E5EBE7] dark:border-[#2D4536] bg-white dark:bg-[#1A2E23] hover:bg-[#F7F9F7] text-xs font-medium text-[#1A2E23] dark:text-white flex items-center gap-1.5 transition cursor-pointer"
-                  >
-                    <DownloadSimple size={14} />
-                    <span>BOL PDF</span>
+                    <span>Open Evidence Pack</span>
                   </button>
                 </div>
               </div>

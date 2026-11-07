@@ -1,20 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ExportBatch, Farmer, Shipment } from '../../types';
-import {
-  FileText,
-  Download,
-  ShieldCheck,
-  AlertTriangle,
-  CheckCircle2,
-  X,
-  Package,
-  FileCheck,
-  Ship,
-  Lock,
-  Layers,
-  Clock,
-  ExternalLink,
-} from 'lucide-react';
+import { ExportBatch, Shipment } from '../../types';
+import { FileText, Download, AlertTriangle, CheckCircle2, X, Package, Clock, Info } from 'lucide-react';
 import {
   buildCompleteAuditDossier,
   downloadAuditDossierZip,
@@ -31,609 +17,221 @@ interface AuditDossierModalProps {
   shipment?: Shipment | null;
 }
 
-export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({
-  batch,
-  isOpen,
-  onClose,
-  shipment,
-}) => {
-  const { farmers, shipments, documents } = useData();
-  const [activeTab, setActiveTab] = useState<'all' | 'phyto' | 'mrl' | 'eudr' | 'bol' | 'manifest'>('all');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [dossierResult, setDossierResult] = useState<AuditDossierResult | null>(null);
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+const Stat: React.FC<{ label: string; value: string | number; note?: string }> = ({ label, value, note }) => (
+  <div className="p-3 rounded-lg border border-[#E5EBE7] dark:border-[#2D4536] bg-[#F7F9F7] dark:bg-[#12201A]">
+    <div className="text-[10px] uppercase tracking-wide font-mono text-[#5A6B60] dark:text-[#A1B3A7]">{label}</div>
+    <div className="text-lg font-bold text-[#1A2E23] dark:text-white">{value}</div>
+    {note && <div className="text-[11px] text-[#5A6B60] dark:text-[#A1B3A7]">{note}</div>}
+  </div>
+);
 
-  // Linked shipment resolution
+export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({ batch, isOpen, onClose, shipment }) => {
+  const { farmers, practices, shipments, documents } = useData();
+  const [isBusy, setIsBusy] = useState(false);
+  const [pack, setPack] = useState<AuditDossierResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const activeShipment = useMemo(() => {
     if (shipment) return shipment;
-    return shipments.find(
-      (s) =>
-        s.container_id === batch.container_id ||
-        s.vessel_name === batch.vessel_name ||
-        s.destination.toLowerCase().includes(batch.destination.toLowerCase().split(',')[0])
-    ) || shipments[0];
+    return (
+      shipments.find(
+        (s) =>
+          (!!batch.container_id && s.container_id === batch.container_id) ||
+          (!!batch.vessel_name && s.vessel_name === batch.vessel_name)
+      ) || null
+    );
   }, [shipment, shipments, batch]);
 
-  // Contributing smallholders
-  const linkedFarmers = useMemo(() => {
-    const list = farmers.filter((f) => batch.farmer_client_uuids?.includes(f.client_uuid));
-    return list.length > 0 ? list : farmers.slice(0, 6);
-  }, [farmers, batch]);
+  // Only farmers actually linked to this batch. No fallback to "the first few farmers".
+  const linkedFarmers = useMemo(
+    () => farmers.filter((f) => batch.farmer_client_uuids?.includes(f.client_uuid)),
+    [farmers, batch]
+  );
 
-  // Document Expiry Sentinel Audit for this batch
-  const sentinelRecords = useMemo(() => {
-    const allRecords = evaluateDocumentEtaRisks(documents, [batch], activeShipment ? [activeShipment] : shipments);
-    return allRecords.filter(
+  const ctx = useMemo(
+    () => ({ farmers, practices, documents, shipment: activeShipment }),
+    [farmers, practices, documents, activeShipment]
+  );
+
+  const flaggedSentinel = useMemo(() => {
+    const records = evaluateDocumentEtaRisks(documents, [batch], activeShipment ? [activeShipment] : shipments);
+    return records.find(
       (r) =>
-        r.batchNumber === batch.batch_number ||
-        r.containerId === batch.container_id ||
-        (r.shipmentCode && r.shipmentCode === activeShipment?.shipment_code)
+        r.isFlagged &&
+        (r.batchNumber === batch.batch_number ||
+          (!!batch.container_id && r.containerId === batch.container_id) ||
+          (!!r.shipmentCode && r.shipmentCode === activeShipment?.shipment_code))
     );
   }, [documents, batch, activeShipment, shipments]);
 
-  const flaggedSentinel = sentinelRecords.find((r) => r.isFlagged);
-
   useEffect(() => {
-    if (isOpen && batch) {
-      let isMounted = true;
-      setIsGenerating(true);
-      buildCompleteAuditDossier(batch, linkedFarmers, activeShipment)
-        .then((res) => {
-          if (isMounted) {
-            setDossierResult(res);
-            setIsGenerating(false);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to build dossier bundle:', err);
-          if (isMounted) setIsGenerating(false);
-        });
-
-      return () => {
-        isMounted = false;
-      };
-    }
-  }, [isOpen, batch, linkedFarmers, activeShipment]);
+    if (!isOpen) return;
+    let live = true;
+    setError(null);
+    setIsBusy(true);
+    buildCompleteAuditDossier(batch, linkedFarmers, ctx)
+      .then((res) => {
+        if (live) setPack(res);
+      })
+      .catch((err) => {
+        console.error('Failed to build evidence pack:', err);
+        if (live) setError('The evidence pack could not be generated. Check the browser console for details.');
+      })
+      .finally(() => {
+        if (live) setIsBusy(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [isOpen, batch, linkedFarmers, ctx]);
 
   if (!isOpen) return null;
 
-  const handleDownloadFullZip = async () => {
+  const handleZip = async () => {
     try {
-      setIsGenerating(true);
-      await downloadAuditDossierZip(batch, linkedFarmers, activeShipment);
-      setDownloadSuccess(true);
-      setTimeout(() => setDownloadSuccess(false), 4000);
+      setIsBusy(true);
+      await downloadAuditDossierZip(batch, linkedFarmers, ctx);
     } catch (err) {
       console.error('Download error:', err);
+      setError('The ZIP could not be created.');
     } finally {
-      setIsGenerating(false);
+      setIsBusy(false);
     }
   };
 
-  const handleDownloadSingle = (type: 'phyto' | 'mrl' | 'eudr_json' | 'eudr_map' | 'bol' | 'manifest') => {
-    if (!dossierResult) return;
-    const { files } = dossierResult;
-    switch (type) {
-      case 'phyto':
-        downloadFile(files.phytosanitaryPdf, files.phytosanitaryFileName, 'application/pdf');
-        break;
-      case 'mrl':
-        downloadFile(files.labMrlPdf, files.labMrlFileName, 'application/pdf');
-        break;
-      case 'eudr_json':
-        downloadFile(files.eudrAnnexIIJson, files.eudrAnnexIIFileName, 'application/json');
-        break;
-      case 'eudr_map':
-        downloadFile(files.eudrMapPdf, files.eudrMapFileName, 'application/pdf');
-        break;
-      case 'bol':
-        downloadFile(files.billOfLadingPdf, files.billOfLadingFileName, 'application/pdf');
-        break;
-      case 'manifest':
-        downloadFile(files.cryptographicManifestJson, files.cryptographicManifestFileName, 'application/json');
-        break;
-    }
-  };
+  const s = pack?.stats;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-4xl max-h-[92vh] bg-white dark:bg-[#1A2E23] rounded-xl shadow-xl border border-[#E5EBE7] dark:border-[#2D4536] flex flex-col overflow-hidden">
-        {/* Header - Quiet, institutional typography */}
-        <div className="px-6 py-4 border-b border-[#E5EBE7] dark:border-[#2D4536] bg-white dark:bg-[#1A2E23] flex items-start justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+      <div className="relative w-full max-w-3xl max-h-[92vh] bg-white dark:bg-[#1A2E23] rounded-xl shadow-xl border border-[#E5EBE7] dark:border-[#2D4536] flex flex-col overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#E5EBE7] dark:border-[#2D4536] flex items-start justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs text-[#5A6B60] dark:text-[#A1B3A7] font-mono mb-1">
-              <span>European Single-Window Documentation</span>
-              <span aria-hidden="true">·</span>
-              <span>Port Inspection Clearance</span>
-              <span aria-hidden="true">·</span>
-              <span>Rotterdam / Hamburg</span>
-            </div>
+            <div className="text-xs text-[#5A6B60] dark:text-[#A1B3A7] font-mono mb-1">Batch evidence pack</div>
             <h3 className="font-serif font-bold text-lg text-[#1A2E23] dark:text-white tracking-tight">
-              Single-Window Customs Audit Dossier
+              {batch.batch_number}
             </h3>
-            <div className="flex items-center gap-2 text-xs text-[#5A6B60] dark:text-[#A1B3A7] mt-1 font-mono">
-              <span className="font-bold text-[#1A2E23] dark:text-white">{batch.batch_number}</span>
-              <span aria-hidden="true">/</span>
-              <span>{batch.crop}</span>
-              <span aria-hidden="true">/</span>
-              <span>{batch.estimated_tonnage} MT Net</span>
-              <span aria-hidden="true">/</span>
-              <span>Dest: {batch.destination}</span>
+            <div className="text-xs text-[#5A6B60] dark:text-[#A1B3A7] mt-1 font-mono">
+              {[batch.crop, batch.estimated_tonnage ? `${batch.estimated_tonnage} MT` : null, batch.destination]
+                .filter(Boolean)
+                .join(' / ')}
             </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-[#8A968E] hover:text-[#1A2E23] dark:hover:text-white transition cursor-pointer"
-          >
+          <button onClick={onClose} aria-label="Close" className="p-1 rounded-md text-[#8A968E] hover:text-[#1A2E23] dark:hover:text-white cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Expiry Sentinel Alert (if flagged) */}
-        {flaggedSentinel && (
-          <div className="mx-6 mt-4 p-3 rounded-lg bg-[#FEF7EC] dark:bg-[#3D2F1B] border border-[#FDE68A] dark:border-[#78350F] text-xs">
-            <div className="flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-[#B8860B] dark:text-[#FCD34D] shrink-0 mt-0.5" />
-              <div className="space-y-0.5">
-                <div className="font-semibold text-[#854D0E] dark:text-[#FCD34D] flex items-center gap-2">
-                  <span>Document Expiry Warning: {flaggedSentinel.documentCategory}</span>
-                  <span className="font-mono text-[11px] font-normal text-[#A16207]">
-                    (Vessel ETA: {flaggedSentinel.etaDateStr})
-                  </span>
-                </div>
-                <p className="text-[#A16207] dark:text-[#FDE68A] leading-relaxed">
-                  {flaggedSentinel.flagReason}
-                </p>
-                <p className="font-medium text-[#854D0E] dark:text-[#FCD34D] pt-0.5">
-                  Directive: {flaggedSentinel.remediationAction}
-                </p>
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="flex gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200">
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+            <p>
+              This pack is assembled from recorded data. TraceHarvest does not issue certificates. Phytosanitary
+              certificates, laboratory reports and bills of lading come from the issuing authority or carrier: upload
+              them to the Documents Vault against this batch and they are attached here unchanged.
+            </p>
+          </div>
+
+          {flaggedSentinel && (
+            <div className="flex gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-xs text-red-900 dark:text-red-200">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold">Document expiry warning: {flaggedSentinel.documentCategory}</div>
+                <p className="mt-0.5">{flaggedSentinel.flagReason}</p>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Tab Navigation - Clean Segmented Border */}
-        <div className="px-6 border-b border-[#E5EBE7] dark:border-[#2D4536] flex items-center gap-4 overflow-x-auto text-xs">
-          {[
-            { id: 'all', label: 'Dossier Checklist' },
-            { id: 'phyto', label: '1. Phytosanitary (NAQS)' },
-            { id: 'mrl', label: '2. SGS Laboratory Assay' },
-            { id: 'eudr', label: '3. EUDR Annex II & Map' },
-            { id: 'bol', label: '4. Bill of Lading & Seal' },
-            { id: 'manifest', label: '5. SHA-256 Manifest' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`py-3 border-b-2 font-medium transition cursor-pointer whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-[#1A4D2E] text-[#1A4D2E] dark:text-white font-semibold'
-                  : 'border-transparent text-[#5A6B60] hover:text-[#1A2E23] dark:hover:text-white'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+          {error && <div className="text-xs text-red-700 dark:text-red-300">{error}</div>}
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {activeTab === 'all' && (
-            <div className="space-y-5">
-              {/* Primary Download Bar - Functional, quiet dark forest green header */}
-              <div className="p-4 rounded-lg bg-[#1A2E23] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs text-[#8A968E] font-mono">Consignment Archive Package</div>
-                  <h4 className="font-serif text-sm font-semibold text-white mt-0.5">
-                    Download Official Customs Audit Dossier (.ZIP)
-                  </h4>
-                  <p className="text-xs text-[#C5D4CB] mt-1 max-w-lg">
-                    Contains official NAQS Phytosanitary Certificate, SGS GC-MS/MS Laboratory Assay, EUDR Annex II GeoJSON, plot polygon cartography, and ocean bill of lading container seal verification.
-                  </p>
-                </div>
+          {s && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Stat label="Farmers" value={s.farmers} note={s.farmers === 0 ? 'None linked' : `${s.farmersWithPolygon} with boundary`} />
+              <Stat label="Practices" value={s.practices} note={`${s.practicesNeedingReview} need review`} />
+              <Stat label="Loss figure recorded" value={`${s.plotsWithRecordedLossFigure}/${s.farmers}`} note={`${s.plotsOnReviewHold} on hold`} />
+              <Stat label="Documents" value={s.documentsAttached} note={`${s.documentsWithFile} with file`} />
+            </div>
+          )}
 
-                <button
-                  onClick={handleDownloadFullZip}
-                  disabled={isGenerating}
-                  className="px-4 py-2.5 rounded-lg bg-[#2D6A4F] hover:bg-[#1A4D2E] active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-2 transition cursor-pointer shrink-0 disabled:opacity-50 shadow-warm-card"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>{isGenerating ? 'Compiling Archive...' : 'Download Dossier (.ZIP)'}</span>
-                </button>
-              </div>
-
-              {downloadSuccess && (
-                <div className="p-3 rounded-lg bg-[#EEF5F1] dark:bg-[#20362A] border border-[#B8D4C2] dark:border-[#2D4536] text-[#1A4D2E] dark:text-[#86EFAC] text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
-                  <span>Customs Audit Dossier downloaded successfully. All 5 regulatory verification files are packaged.</span>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-[#5A6B60] dark:text-[#A1B3A7] mb-2">Files in this pack</h4>
+            <div className="space-y-2">
+              {isBusy && !pack && (
+                <div className="flex items-center gap-2 text-xs text-[#5A6B60]">
+                  <Clock className="w-4 h-4" /> Generating…
                 </div>
               )}
+              {pack?.files.map((f) => (
+                <div key={f.name} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-[#E5EBE7] dark:border-[#2D4536]">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-[#1A2E23] dark:text-white">
+                      <FileText className="w-4 h-4 shrink-0" /> <span className="truncate">{f.label}</span>
+                    </div>
+                    <p className="text-[11px] text-[#5A6B60] dark:text-[#A1B3A7]">{f.description}</p>
+                    <p className="text-[10px] font-mono text-[#8A968E] truncate">SHA-256 {f.sha256}</p>
+                  </div>
+                  <button
+                    onClick={() => downloadFile(f.data, f.name, f.mime)}
+                    className="shrink-0 p-2 rounded-md border border-[#E5EBE7] dark:border-[#2D4536] hover:bg-[#F7F9F7] dark:hover:bg-[#12201A] cursor-pointer"
+                    aria-label={`Download ${f.label}`}
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
 
-              {/* Document Checklist Items - High-Density Clean List */}
-              <div className="border border-[#E5EBE7] dark:border-[#2D4536] rounded-lg divide-y divide-[#E5EBE7] dark:divide-[#2D4536] text-xs">
-                {/* 1. Phyto */}
-                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-[#1A2E23]">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[#1A2E23] dark:text-white">
-                        1. Official Phytosanitary Certificate (NAQS Form 1)
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-[#5A6B60] dark:text-[#A1B3A7] mb-2">Uploaded documents for this batch</h4>
+            {pack && pack.attached.length === 0 && (
+              <p className="text-xs text-[#5A6B60] dark:text-[#A1B3A7]">
+                None yet. Upload the phytosanitary certificate, laboratory report and bill of lading in the Documents Vault.
+              </p>
+            )}
+            <div className="space-y-2">
+              {pack?.attached.map((d) => (
+                <div key={d.id} className="p-3 rounded-lg border border-[#E5EBE7] dark:border-[#2D4536] text-xs">
+                  <div className="font-semibold text-[#1A2E23] dark:text-white">{d.title}</div>
+                  <div className="text-[#5A6B60] dark:text-[#A1B3A7]">
+                    {[d.regulatory_authority, d.certificate_number, d.expiry_date ? `expires ${d.expiry_date}` : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    {d.hash_matches === true && (
+                      <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> File matches its stored checksum
                       </span>
-                      <span className="text-[#5A6B60] font-mono text-[11px]">· IPPC Plant Health Standard</span>
-                    </div>
-                    <p className="text-[#5A6B60] dark:text-[#A1B3A7] text-[11px]">
-                      Certified free from Trogoderma granarium (Khapra beetle). Phosphine degassing &lt;0.01 ppm verified. Valid 60 days.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDownloadSingle('phyto')}
-                    className="px-3 py-1.5 rounded-md border border-[#E5EBE7] dark:border-[#2D4536] hover:bg-[#F7F9F7] text-[#1A2E23] dark:text-white text-xs font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5 text-[#5A6B60]" />
-                    <span>Download PDF</span>
-                  </button>
-                </div>
-
-                {/* 2. Lab MRL */}
-                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-slate-900">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        2. SGS Gas-Chromatography MRL Assay Report
+                    )}
+                    {d.hash_matches === false && (
+                      <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-300">
+                        <AlertTriangle className="w-3.5 h-3.5" /> File does not match its stored checksum
                       </span>
-                      <span className="text-slate-500 font-mono text-[11px]">· ISO/IEC 17025 Accredited</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                      GC-MS/MS & LC-MS/MS screen. Chlorpyrifos &lt;0.005 mg/kg (EU 0.01 limit). Satisfies EC 396/2005.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDownloadSingle('mrl')}
-                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Download PDF</span>
-                  </button>
-                </div>
-
-                {/* 3. EUDR */}
-                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-slate-900">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        3. EUDR Due Diligence Statement & Plot Cartography
+                    )}
+                    {d.hash_matches === null && (
+                      <span className="text-[#5A6B60] dark:text-[#A1B3A7]">
+                        {d.included_in_zip ? 'Included, no stored checksum to compare' : 'File content not held here, listed only'}
                       </span>
-                      <span className="text-slate-500 font-mono text-[11px]">· Regulation (EU) 2023/1115</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                      Annex II GeoJSON with operator EORI NL823901456, WGS84 plot boundaries, and Sentinel-2 satellite baseline confirmation.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleDownloadSingle('eudr_json')}
-                      className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-slate-500" />
-                      <span>GeoJSON</span>
-                    </button>
-                    <button
-                      onClick={() => handleDownloadSingle('eudr_map')}
-                      className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Map PDF</span>
-                    </button>
+                    )}
+                    <span className="text-[#8A968E]">· vault status: {d.verification_status}</span>
                   </div>
                 </div>
-
-                {/* 4. Bill of Lading */}
-                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-slate-900">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        4. Maritime Bill of Lading & Container Bolt Seal
-                      </span>
-                      <span className="text-slate-500 font-mono text-[11px]">· ISO 17712 High-Security / SOLAS VGM</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                      Container {batch.container_id || activeShipment?.container_id || 'MSCU-904128-4'} on vessel {batch.vessel_name || activeShipment?.vessel_name || 'CMA CGM Africa One'}. Seal intact.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDownloadSingle('bol')}
-                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Download PDF</span>
-                  </button>
-                </div>
-
-                {/* 5. Manifest */}
-                <div className="p-3.5 flex items-center justify-between gap-4 bg-white dark:bg-slate-900">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        5. Cryptographic SHA-256 Chain Verification Manifest
-                      </span>
-                      <span className="text-slate-500 font-mono text-[11px]">· ECDSA P-256 Digest</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                      Master Merkle root establishing tamper-proof chain of custody across all 5 regulatory instruments.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDownloadSingle('manifest')}
-                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Manifest JSON</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Master Root Hash */}
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs font-mono">
-                <span className="text-slate-500">Master Merkle Root SHA-256: </span>
-                <span className="text-slate-800 dark:text-slate-200 break-all select-all font-semibold">
-                  {dossierResult?.manifestSummary.masterSha256 || batch.tamper_proof_sha256}
-                </span>
-              </div>
+              ))}
             </div>
-          )}
-
-          {activeTab === 'phyto' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    Nigeria Agricultural Quarantine Service (NAQS) Certificate
-                  </h4>
-                  <p className="text-slate-500 font-mono text-[11px]">
-                    Statutory Authority: Plant Quarantine Act 2018 · IPPC Standards
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDownloadSingle('phyto')}
-                  className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Certificate PDF</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 font-mono">
-                <div>
-                  <span className="text-slate-500 text-[11px]">Certificate Number</span>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
-                    NAQS-EXP-KN-{batch.batch_number.replace(/\D/g, '') || '9042'}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[11px]">Inspection Station</span>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
-                    Kano Inland Dry Port
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[11px]">Date of Inspection</span>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100 mt-0.5">2026-09-28</div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[11px]">Validity Term</span>
-                  <div className="font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">60 Days</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'mrl' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    SGS Testing Services — Gas Chromatography Assay Report
-                  </h4>
-                  <p className="text-slate-500 font-mono text-[11px]">
-                    Methodology: QuEChERS (EN 15662:2018) · GC-MS/MS & LC-MS/MS
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDownloadSingle('mrl')}
-                  className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Lab PDF</span>
-                </button>
-              </div>
-
-              <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800 text-slate-500 text-[11px]">
-                    <tr>
-                      <th className="py-2.5 px-3">Target Analyte</th>
-                      <th className="py-2.5 px-3">Method</th>
-                      <th className="py-2.5 px-3">Detected</th>
-                      <th className="py-2.5 px-3">EU MRL Threshold</th>
-                      <th className="py-2.5 px-3 text-right">Verdict</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">Chlorpyrifos</td>
-                      <td className="py-2 px-3 text-slate-500">GC-MS/MS</td>
-                      <td className="py-2 px-3 font-semibold">&lt;0.005 mg/kg</td>
-                      <td className="py-2 px-3 text-slate-500">0.010 mg/kg</td>
-                      <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400 font-semibold">Cleared</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">Lambda-cyhalothrin</td>
-                      <td className="py-2 px-3 text-slate-500">GC-MS/MS</td>
-                      <td className="py-2 px-3 font-semibold">0.008 mg/kg</td>
-                      <td className="py-2 px-3 text-slate-500">0.050 mg/kg</td>
-                      <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400 font-semibold">Cleared</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">Dichlorvos (DDVP)</td>
-                      <td className="py-2 px-3 text-slate-500">GC-MS/MS</td>
-                      <td className="py-2 px-3 font-semibold">NOT DETECTED</td>
-                      <td className="py-2 px-3 text-slate-500">0.010 mg/kg</td>
-                      <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400 font-semibold">Cleared</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-slate-800 dark:text-slate-200">Flubendiamide</td>
-                      <td className="py-2 px-3 text-slate-500">LC-MS/MS</td>
-                      <td className="py-2 px-3 font-semibold">0.012 mg/kg</td>
-                      <td className="py-2 px-3 text-slate-500">0.200 mg/kg</td>
-                      <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400 font-semibold">Cleared</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'eudr' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    Regulation (EU) 2023/1115 Annex II Due Diligence
-                  </h4>
-                  <p className="text-slate-500 font-mono text-[11px]">
-                    Cutoff Date: 31 December 2020 · Copernicus Sentinel-2 Verified
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleDownloadSingle('eudr_json')}
-                    className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                    <span>GeoJSON</span>
-                  </button>
-                  <button
-                    onClick={() => handleDownloadSingle('eudr_map')}
-                    className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Cartographic Map PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 dark:border-slate-800 rounded-lg divide-y divide-slate-200 dark:divide-slate-800 font-mono">
-                {linkedFarmers.map((f) => (
-                  <div key={f.client_uuid} className="p-2.5 flex items-center justify-between text-[11px]">
-                    <div>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{f.official_farmer_id}</span>
-                      <span className="text-slate-500 ml-2 font-sans">{f.full_name} ({f.lga}, {f.state})</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-slate-600 dark:text-slate-300">{f.farm_size_hectares} ha</span>
-                      <span className="text-emerald-700 dark:text-emerald-400 ml-3 font-semibold">0% Loss Verified</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'bol' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    Ocean Bill of Lading & Container Bolt Seal
-                  </h4>
-                  <p className="text-slate-500 font-mono text-[11px]">
-                    Carrier: {batch.vessel_name || activeShipment?.vessel_name || 'CMA CGM Africa One'} · Loading: Lagos Port Apapa (NGAPP)
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDownloadSingle('bol')}
-                  className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Bill of Lading PDF</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 font-mono text-xs">
-                <div>
-                  <span className="text-slate-500 text-[11px]">Container Number</span>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {batch.container_id || activeShipment?.container_id || 'MSCU-904128-4'}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[11px]">ISO 17712 Bolt Seal</span>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
-                    NG-SEAL-ISO-{batch.batch_number.replace(/\D/g, '') || '88902'}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[11px]">Seal Status</span>
-                  <div className="font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">Verified Intact</div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[11px]">Discharge Port</span>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100 mt-0.5">{batch.destination}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'manifest' && (
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    Cryptographic SHA-256 Integrity Chain Manifest
-                  </h4>
-                  <p className="text-slate-500 font-mono text-[11px]">
-                    Single-Window Verification Anchor · ECDSA P-256
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDownloadSingle('manifest')}
-                  className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Download Manifest JSON</span>
-                </button>
-              </div>
-
-              <pre className="p-3.5 rounded-lg bg-slate-900 text-slate-300 font-mono text-[11px] overflow-x-auto max-h-72 border border-slate-800">
-                {dossierResult?.files.cryptographicManifestJson || 'Computing SHA-256 chain verification manifest...'}
-              </pre>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between text-xs font-mono text-slate-500">
-          <div>
-            <span>Consignment SHA-256: </span>
-            <span className="text-slate-700 dark:text-slate-300">{batch.tamper_proof_sha256.substring(0, 16)}...</span>
-          </div>
-
-          <div className="flex items-center gap-2 font-sans">
-            <button
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium transition cursor-pointer"
-            >
-              Close
-            </button>
-            <button
-              onClick={handleDownloadFullZip}
-              disabled={isGenerating}
-              className="px-4 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>{isGenerating ? 'Compiling...' : 'Download Dossier (.ZIP)'}</span>
-            </button>
-          </div>
+        <div className="px-6 py-4 border-t border-[#E5EBE7] dark:border-[#2D4536] flex items-center justify-between gap-3">
+          <p className="text-[10px] font-mono text-[#8A968E] truncate">
+            {pack ? `Pack checksum ${pack.packChecksum.slice(0, 16)}…` : ''}
+          </p>
+          <button
+            onClick={handleZip}
+            disabled={isBusy || !pack}
+            className="px-4 py-2 rounded-lg bg-[#1B7F4B] hover:bg-[#166B3F] disabled:opacity-50 text-white text-sm font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <Package className="w-4 h-4" /> Download ZIP
+          </button>
         </div>
       </div>
     </div>
