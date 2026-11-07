@@ -1794,24 +1794,6 @@ app.post(['/auth/login', '/api/v1/auth/login'], (req: Request, res: Response) =>
     });
   }
 
-  // 1. Check if email matches admin
-  if (username === 'admin@traceharvest.ng' && password === 'TraceHarvest2026!') {
-    const accessToken = Buffer.from(JSON.stringify({ sub: username, role: 'admin', name: 'Chief Compliance Director', exp: Date.now() + 604800000 })).toString('base64url');
-    const refreshToken = Buffer.from(JSON.stringify({ sub: username, role: 'admin', type: 'refresh', exp: Date.now() + 2592000000 })).toString('base64url');
-    return res.json({
-      access_token: `th_jwt_${accessToken}`,
-      refresh_token: `th_ref_${refreshToken}`,
-      token_type: 'bearer',
-      expires_in: 604800,
-      user: {
-        id: 'admin-01',
-        email: username,
-        role: 'admin',
-        full_name: 'Chief Compliance Director',
-      },
-    });
-  }
-
   // 2. Check registered agents across database (by agent_id, id, email, or phone)
   const normalizedUser = (username || '').toLowerCase().trim();
   const agent = Object.values(db.agents || {}).find(
@@ -1823,13 +1805,9 @@ app.post(['/auth/login', '/api/v1/auth/login'], (req: Request, res: Response) =>
   );
 
   if (agent) {
-    // Verify password (hash, default seed password, or demo password)
+    // Only a stored password hash is accepted. There is no default or fallback password.
     const passHash = crypto.createHash('sha256').update(password || '').digest('hex');
-    const isPasswordValid =
-      !agent.password_hash ||
-      agent.password_hash === passHash ||
-      password === 'TraceHarvest2026!' ||
-      password === 'password123';
+    const isPasswordValid = !!agent.password_hash && agent.password_hash === passHash;
 
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'INVALID_CREDENTIALS', detail: 'Incorrect password for agent account.' });
@@ -1924,13 +1902,9 @@ app.post(['/auth/refresh', '/api/v1/auth/refresh'], (req: Request, res: Response
   });
 });
 
-app.get(['/auth/me', '/api/v1/auth/me'], (req: Request, res: Response) => {
-  res.json({
-    id: 1,
-    email: 'admin@traceharvest.ng',
-    role: 'admin',
-    full_name: 'Chief Compliance Director',
-  });
+// Admin identity comes from Firebase and the real backend. This legacy mock has none.
+app.get(['/auth/me', '/api/v1/auth/me'], (_req: Request, res: Response) => {
+  res.status(401).json({ error: 'NOT_AUTHENTICATED' });
 });
 
 // ==============================================================
@@ -2020,7 +1994,7 @@ app.post(['/documents/upload', '/api/v1/documents/upload'], (req: Request, res: 
     issue_date: payload.issue_date || new Date().toISOString().split('T')[0],
     expiry_date: payload.expiry_date || undefined,
     verification_status: payload.verification_status || 'PENDING_REVIEW',
-    uploaded_by: payload.uploaded_by || 'admin@traceharvest.ng',
+    uploaded_by: payload.uploaded_by || '',
     uploader_source: payload.uploader_source || 'web_admin',
     uploaded_at: new Date(serverTimestamp).toISOString(),
     verified_by: payload.verified_by,
@@ -2134,7 +2108,7 @@ app.get(['/documents/:id/download', '/api/v1/documents/:id/download'], (req: Req
 // Backend Files Inspection & Download Endpoint
 app.get('/api/backend/files/:filename', (req: Request, res: Response) => {
   const filename = path.basename(req.params.filename);
-  const allowedFiles = ['schema.sql', 'docker-compose.yml', 'seed.py', 'README.md', 'requirements.txt', '.env'];
+  const allowedFiles = ['schema.sql', 'docker-compose.yml', 'README.md', 'requirements.txt', '.env'];
   if (!allowedFiles.includes(filename)) {
     return res.status(403).json({ error: 'File access not permitted' });
   }
