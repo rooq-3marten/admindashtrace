@@ -518,89 +518,37 @@ export function detectBoundaryOverlaps(
 }
 
 // ============================================================================
-// 5. Automated Remote Sensing Tree-Cover Validation (Copernicus Sentinel-2 & GFW)
+// 5. Deforestation check from RECORDED values only
 // ============================================================================
 
-/**
- * Deterministic pseudo-hash for reproducible satellite evidence tokens
- */
-function createEvidenceHash(input: string): string {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    const char = input.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  const hex = Math.abs(hash).toString(16).padStart(8, '0');
-  return `eudr-sentinel2-${hex}-sha256-verified`;
-}
+/** Review threshold in hectares of post-2020 tree cover loss. */
+export const TREE_COVER_LOSS_THRESHOLD_HA = 0.1;
 
 /**
- * Automated Remote Sensing Tree-Cover Validation:
- * Intersects plot geometry with December 31, 2020 forest baseline and latest Copernicus Sentinel-2 MSI L2A pass.
- * 
- * Exact regulatory rules:
- * - 0% Tree Cover Loss: Automatically marked EUDR Certified (risk_score = 0).
- * - > 0.1 ha Disturbance: Automatically locked in Compliance Review Hold with satellite timestamped evidence.
+ * Reports what is recorded on the farmer record and nothing else.
+ * No satellite or forest-baseline data source is connected to this dashboard, so nothing is
+ * measured, estimated or defaulted here. A plot with no recorded loss figure is NOT_ASSESSED,
+ * which must never be shown or exported as compliant.
  */
-export function analyzeRemoteSensingTreeCover(
-  farmer: Farmer,
-  overrideDisturbanceHa?: number
-): EudrRemoteSensingAnalysis {
-  const farmHa = farmer.farm_size_hectares || 4.5;
-  const state = (farmer.state || 'Kano').toLowerCase();
+export function analyzeRemoteSensingTreeCover(farmer: Farmer): EudrRemoteSensingAnalysis {
+  const farmHa = typeof farmer.farm_size_hectares === 'number' && farmer.farm_size_hectares > 0
+    ? farmer.farm_size_hectares
+    : null;
+  const recorded = typeof farmer.tree_cover_loss_post_2020_ha === 'number' && Number.isFinite(farmer.tree_cover_loss_post_2020_ha)
+    ? Math.max(0, Math.round(farmer.tree_cover_loss_post_2020_ha * 100) / 100)
+    : null;
 
-  // Regional baseline canopy density in Dec 2020:
-  // Sahel/Sudan (Kano, Jigawa): 6% - 14% canopy (shea, neem, acacia agroforestry)
-  // Guinea savanna (Kaduna): 12% - 20% canopy
-  // Southern Guinea / Forest transition (Benue): 22% - 35% canopy
-  let baselineCanopyPct = 12.4;
-  if (state.includes('kano') || state.includes('jigawa')) {
-    baselineCanopyPct = 11.2;
-  } else if (state.includes('kaduna')) {
-    baselineCanopyPct = 18.5;
-  } else if (state.includes('benue')) {
-    baselineCanopyPct = 26.8;
+  let verdict: EudrRemoteSensingAnalysis['eudr_compliance_verdict'] = 'NOT_ASSESSED';
+  let summary = 'No tree-cover-loss figure is recorded for this plot, so it has not been assessed. This is not a compliance result.';
+  let lossPct: number | null = null;
+
+  if (recorded !== null) {
+    verdict = recorded > TREE_COVER_LOSS_THRESHOLD_HA ? 'COMPLIANCE_REVIEW_HOLD' : 'NO_LOSS_RECORDED';
+    lossPct = farmHa ? Math.min(100, Math.round((recorded / farmHa) * 1000) / 10) : null;
+    summary = verdict === 'COMPLIANCE_REVIEW_HOLD'
+      ? `A recorded loss of ${recorded} ha after 31 Dec 2020 is above the ${TREE_COVER_LOSS_THRESHOLD_HA} ha review threshold. Hold for human review.`
+      : `A recorded loss of ${recorded} ha after 31 Dec 2020 is at or under the ${TREE_COVER_LOSS_THRESHOLD_HA} ha review threshold. This reflects the stored figure only and is not independently verified.`;
   }
-
-  // Determine tree cover loss post-Dec 31, 2020:
-  // Use override if provided; otherwise check farmer flags or simulate real smallholder compliance
-  let lossHa = 0.0;
-  if (typeof overrideDisturbanceHa === 'number') {
-    lossHa = overrideDisturbanceHa;
-  } else if (typeof farmer.tree_cover_loss_post_2020_ha === 'number') {
-    lossHa = farmer.tree_cover_loss_post_2020_ha;
-  } else if (farmer.official_farmer_id === 'TH-BEN-2026-5521') {
-    // Intentional real demonstration parcel in Benue transition forest with 0.35 ha disturbance
-    lossHa = 0.35;
-  } else {
-    // Certified compliant smallholder baseline: 0.00 ha loss
-    lossHa = 0.0;
-  }
-
-  lossHa = Math.round(lossHa * 100) / 100;
-  const isLossDetected = lossHa > 0.1; // Regulation threshold (> 0.1 ha disturbance)
-
-  const verdict = isLossDetected ? 'COMPLIANCE_REVIEW_HOLD' : 'EUDR_CERTIFIED';
-  const riskScore = isLossDetected ? Math.min(98, Math.round(75 + (lossHa / farmHa) * 100)) : 0;
-  const lossPct = Math.min(100, Math.round((lossHa / farmHa) * 1000) / 10);
-  const currentCanopyPct = Math.max(0, Math.round((baselineCanopyPct - lossPct * 0.4) * 10) / 10);
-
-  // Copernicus Sentinel-2 MSI L2A Tile Acquisition Metadata
-  const tileCode = state.includes('kano') ? 'T32PQR' : state.includes('jigawa') ? 'T32PQS' : state.includes('kaduna') ? 'T32PMR' : 'T32NQK';
-  const acquisitionDate = '2026-03-24';
-  const tileId = `${tileCode}_${acquisitionDate.replace(/-/g, '')}T095031`;
-
-  const meanNdvi2020 = Math.round((0.52 + baselineCanopyPct / 100) * 100) / 100;
-  const ndviDrop = isLossDetected ? -0.28 : -0.01;
-  const meanNdviCurrent = Math.round((meanNdvi2020 + ndviDrop) * 100) / 100;
-
-  const evidencePayload = `${farmer.client_uuid}_${farmer.official_farmer_id}_${lossHa}_${tileId}_20201231`;
-  const evidenceHash = createEvidenceHash(evidencePayload);
-
-  const summary = isLossDetected
-    ? `Copernicus Sentinel-2 multispectral MSI L2A sensor detected ${lossHa} ha canopy disturbance post-Dec 31, 2020 baseline (NDVI drop: ${ndviDrop}). Plot locked in Compliance Review Hold per Regulation (EU) 2023/1115 Art. 3.`
-    : `Copernicus Sentinel-2 & Global Forest Watch (GFW) intersection confirmed 0.00 ha tree cover loss post-Dec 31, 2020 baseline across ${farmHa} ha parcel. Automatically marked EUDR Certified.`;
 
   return {
     farmer_id: farmer.official_farmer_id || farmer.client_uuid,
@@ -610,24 +558,11 @@ export function analyzeRemoteSensingTreeCover(
     administrative_region: farmer.state,
     farm_size_hectares: farmHa,
     baseline_cutoff_date: '2020-12-31',
-    forest_baseline_2020_pct: baselineCanopyPct,
-    current_tree_cover_pct: currentCanopyPct,
-    tree_cover_loss_post_2020_ha: lossHa,
+    basis: recorded !== null ? 'RECORDED_VALUE' : 'NOT_ASSESSED',
+    tree_cover_loss_post_2020_ha: recorded,
     tree_cover_loss_pct: lossPct,
-    canopy_status: isLossDetected ? 'DISTURBANCE_REVIEW_HOLD' : '0%_LOSS_EUDR_CERTIFIED',
     eudr_compliance_verdict: verdict,
-    risk_score: riskScore,
-    copernicus_sentinel: {
-      sensor: 'Copernicus Sentinel-2B MSI L2A (10m Resolution)',
-      tile_id: tileId,
-      acquisition_date: acquisitionDate,
-      cloud_cover_pct: 1.2,
-      mean_ndvi_2020: meanNdvi2020,
-      mean_ndvi_current: meanNdviCurrent,
-      ndvi_drop_delta: ndviDrop,
-    },
-    satellite_evidence_sha256: evidenceHash,
-    timestamped_evidence_summary: summary,
+    summary,
   };
 }
 
@@ -662,9 +597,9 @@ export function generateOfficialEudrAnnexIIGeoJson(
   farmers: Farmer[],
   options: EudrExportOptions = {}
 ): EudrAnnexIIFeatureCollection {
-  const commodity = options.commodity || 'Sesame';
+  const commodity = options.commodity || 'ALL';
   const country = options.countryOfProduction || 'NGA';
-  const ddsId = options.eudrDueDiligenceId || 'DDS-2026-90412';
+  const ddsId = options.eudrDueDiligenceId || '';
 
   // Filter farmers by commodity if specified (or all if 'ALL')
   let targetFarmers = farmers;
@@ -711,15 +646,10 @@ export function generateOfficialEudrAnnexIIGeoJson(
         country_of_production: country,
         administrative_region: farmer.state,
         farm_size_hectares: cleanTopo.calculated_hectares || farmer.farm_size_hectares,
-        eudr_compliance_status: rsAnalysis.eudr_compliance_verdict,
+        eudr_assessment_status: rsAnalysis.eudr_compliance_verdict,
         tree_cover_loss_post_2020_ha: rsAnalysis.tree_cover_loss_post_2020_ha,
-        tree_cover_baseline_2020_pct: rsAnalysis.forest_baseline_2020_pct,
-        current_tree_cover_pct: rsAnalysis.current_tree_cover_pct,
-        sentinel2_acquisition_date: rsAnalysis.copernicus_sentinel.acquisition_date,
-        sentinel2_tile_id: rsAnalysis.copernicus_sentinel.tile_id,
         postgis_topology_status: cleanTopo.was_repaired ? 'ST_MakeValid_REPAIRED' : 'ST_MakeValid_PASSED',
         neighbor_overlap_detected: overlapReport.overlap_detected,
-        tamper_proof_evidence_sha256: rsAnalysis.satellite_evidence_sha256,
       },
     };
 
@@ -732,14 +662,14 @@ export function generateOfficialEudrAnnexIIGeoJson(
       commodity,
       country_of_production: country,
       eudr_due_diligence_id: ddsId,
-      operator_name: options.operatorName || 'TraceHarvest Export Logistics & Commodities Ltd',
-      operator_eori: options.operatorEori || 'NL847291038',
-      export_batch_id: options.exportBatchId || 'EXP-TH-2026-BATCH-402',
+      operator_name: options.operatorName || '',
+      operator_eori: options.operatorEori || '',
+      export_batch_id: options.exportBatchId || '',
       regulation_standard: 'Regulation (EU) 2023/1115 Annex II',
       cutoff_date: '2020-12-31T23:59:59Z',
       generation_timestamp: new Date().toISOString(),
       total_plots_count: features.length,
-      total_certified_hectares: Math.round(totalHa * 10) / 10,
+      total_mapped_hectares: Math.round(totalHa * 10) / 10,
     },
     features,
   };
