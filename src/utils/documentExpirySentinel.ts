@@ -106,34 +106,13 @@ function matchDocToShipmentAndBatch(
     );
   }
 
-  // 4. Default fallback to primary Rotterdam / Hamburg shipments
-  if (!matchedShipment) {
-    matchedShipment = shipments[0] || {
-      id: 'ship-default',
-      shipment_code: 'EXP-0042',
-      destination: 'Rotterdam, Netherlands (EU)',
-      vessel_name: 'CMA CGM Africa One',
-      container_id: 'MSCU-904128-4',
-      departure_date: '2026-09-24',
-      estimated_arrival: '2026-10-14',
-      status: 'In Transit',
-      batches_count: 2,
-      total_tonnage: 42.5,
-      carrier: 'Maersk Line',
-    };
-  }
-
-  if (!matchedBatch) {
-    matchedBatch = batches[0];
-  }
-
   return { matchedBatch, matchedShipment };
 }
 
 /**
  * Main Evaluation Engine:
  * Compares Phytosanitary & Lab Assay expiry dates against ocean vessel Estimated Time of Arrival (ETA).
- * Flags any document expiring within 14 days of vessel arrival at Rotterdam/Hamburg.
+ * Flags any document expiring within 14 days of vessel arrival.
  */
 export function evaluateDocumentEtaRisks(
   documents: RegulatoryDocument[],
@@ -150,22 +129,13 @@ export function evaluateDocumentEtaRisks(
   for (const doc of targetDocs) {
     const { matchedBatch, matchedShipment } = matchDocToShipmentAndBatch(doc, batches, shipments);
 
-    const etaStr = matchedShipment?.estimated_arrival || '2026-10-14';
-    const etaMs = parseDateMs(etaStr) || currentDateMs + 10 * 86400000;
-
-    // Resolve expiry date: if missing, assign realistic regulatory window
-    let expiryStr = doc.expiry_date;
-    if (!expiryStr) {
-      if (doc.category === 'PHYTOSANITARY') {
-        // NAQS certificates standard validity: 60 days from issue or 14-21 days post-ETA
-        expiryStr = '2026-10-22';
-      } else {
-        // SGS lab assays validity: 30-45 days from issue
-        expiryStr = '2026-10-19';
-      }
-    }
-
-    const expiryMs = parseDateMs(expiryStr) || etaMs + 7 * 86400000;
+    // Only evaluate when the shipment's arrival date and the document's expiry date are both recorded.
+    // Nothing is assumed or defaulted.
+    const etaStr = matchedShipment?.estimated_arrival;
+    const expiryStr = doc.expiry_date;
+    const etaMs = etaStr ? parseDateMs(etaStr) : null;
+    const expiryMs = expiryStr ? parseDateMs(expiryStr) : null;
+    if (!matchedShipment || !etaStr || !expiryStr || !etaMs || !expiryMs) continue;
 
     const daysFromNowToEta = Math.round((etaMs - currentDateMs) / 86400000);
     const daysFromNowToExpiry = Math.round((expiryMs - currentDateMs) / 86400000);
@@ -181,32 +151,32 @@ export function evaluateDocumentEtaRisks(
       riskLevel = 'CRITICAL_EXPIRED_BEFORE_ETA';
       riskScore = 98;
       isFlagged = true;
-      flagReason = `Certificate expires ${Math.abs(daysFromEtaToExpiry)} days BEFORE vessel arrival at ${matchedShipment?.destination}. Immediate customs rejection & quarantine hold guaranteed upon discharge!`;
+      flagReason = `Certificate expires ${Math.abs(daysFromEtaToExpiry)} days BEFORE vessel arrival at ${matchedShipment.destination}. Likely customs rejection or quarantine hold on arrival.`;
       remediationAction =
         doc.category === 'PHYTOSANITARY'
-          ? 'Emergency NAQS Electronic Re-inspection & Reissuance via Single-Window Portal required immediately.'
-          : 'Express 24h SGS/NAFDAC Laboratory Retest required with electronic transmission to Rotterdam Port Health.';
+          ? 'Obtain a reissued certificate from the issuing authority before the vessel arrives.'
+          : 'Arrange a new laboratory test and send the result to the destination port.';
     } else if (daysFromEtaToExpiry <= 14) {
       riskLevel = 'FLAGGED_EXPIRING_WITHIN_14_DAYS';
       riskScore = 85;
       isFlagged = true;
-      flagReason = `Document expires within ${daysFromEtaToExpiry} days of vessel ETA (${etaStr}). Port inspection delays at Rotterdam/Hamburg pose severe quarantine detention risk.`;
+      flagReason = `Document expires within ${daysFromEtaToExpiry} days of vessel ETA (${etaStr}). Port inspection delays could cause a detention risk.`;
       remediationAction =
         doc.category === 'PHYTOSANITARY'
-          ? 'Initiate fast-track 30-day NAQS validity extension certificate through National Plant Protection Organization.'
-          : 'Request expedited confirmation assay certificate from SGS Agricultural Services (ISO 17025).';
+          ? 'Ask the issuing authority about an extension or reissue.'
+          : 'Ask the laboratory for an updated result.';
     } else if (daysFromEtaToExpiry <= 21) {
       riskLevel = 'WARNING_APPROACHING_MARGIN';
       riskScore = 50;
       isFlagged = false;
-      flagReason = `Adequate but narrow buffer: ${daysFromEtaToExpiry} days between ETA and document expiry. Maritime weather or canal transit delays must be monitored.`;
-      remediationAction = 'Queue for automated re-check 7 days prior to port arrival. Notify destination clearing broker.';
+      flagReason = `Adequate but narrow buffer: ${daysFromEtaToExpiry} days between ETA and document expiry. Monitor the voyage for delays.`;
+      remediationAction = 'Re-check this document a week before arrival.';
     } else {
       riskLevel = 'COMPLIANT_SAFE_MARGIN';
       riskScore = 10;
       isFlagged = false;
-      flagReason = `Compliant: ${daysFromEtaToExpiry} days validity remaining after vessel ETA. Zero customs expiration risk.`;
-      remediationAction = 'Clear for European Single-Window customs declaration submission.';
+      flagReason = `Compliant: ${daysFromEtaToExpiry} days validity remaining after vessel ETA. No expiry risk on current dates.`;
+      remediationAction = 'No action needed on expiry timing.';
     }
 
     records.push({
@@ -218,12 +188,12 @@ export function evaluateDocumentEtaRisks(
       expiryDateStr: expiryStr,
       expiryTimestampMs: expiryMs,
       batchNumber: matchedBatch?.batch_number || doc.entity_id,
-      crop: matchedBatch?.crop || 'Produce',
-      shipmentCode: matchedShipment?.shipment_code || 'SHIP-EXP',
-      vesselName: matchedShipment?.vessel_name || 'CMA CGM Africa One',
-      containerId: matchedShipment?.container_id || 'MSCU-904128-4',
-      destinationPort: matchedShipment?.destination || 'Rotterdam, Netherlands (EU)',
-      departureDateStr: matchedShipment?.departure_date || '2026-09-24',
+      crop: matchedBatch?.crop || '',
+      shipmentCode: matchedShipment.shipment_code,
+      vesselName: matchedShipment.vessel_name,
+      containerId: matchedShipment.container_id,
+      destinationPort: matchedShipment.destination,
+      departureDateStr: matchedShipment.departure_date,
       etaDateStr: etaStr,
       etaTimestampMs: etaMs,
       daysFromNowToEta,
