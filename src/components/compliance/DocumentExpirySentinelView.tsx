@@ -105,7 +105,7 @@ export const DocumentExpirySentinelView: React.FC = () => {
             <span aria-hidden="true">·</span>
             <span>Port of Arrival ETA Surveillance</span>
             <span aria-hidden="true">·</span>
-            <span>Rotterdam / Hamburg Customs</span>
+            <span>Destination customs</span>
           </div>
           <h2 className="font-serif font-bold text-xl text-[#1A2E23] dark:text-white tracking-tight">
             Document Expiry Sentinel & Maritime Arrival Buffer
