@@ -191,7 +191,6 @@ export const ShipmentsView: React.FC = () => {
 
           <div className="p-3 border-t border-[#E5EBE7] dark:border-[#2D4536] bg-[#FBFCFB] dark:bg-[#14261C] flex items-center justify-between text-xs text-[#5A6B60] dark:text-[#8A968E] font-mono">
             <span>Showing {filtered.length} cargo consignments</span>
-            <span>Port of Discharge: Maasvlakte / Hamburg</span>
           </div>
         </div>
 
@@ -271,24 +270,6 @@ export const ShipmentsView: React.FC = () => {
                 <div className="p-3 rounded-lg bg-[#FBFCFB] dark:bg-[#14261C] border border-[#E5EBE7] dark:border-[#2D4536]">
                   <span className="text-[11px] text-[#8A968E] block">Arrival Window (ETA)</span>
                   <div className="font-semibold text-[#2D6A4F] dark:text-[#86EFAC] mt-0.5">{selectedShipment.estimated_arrival}</div>
-                </div>
-              </div>
-
-              {/* Seal Integrity & Security */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#8A968E]">
-                  Container Seal Integrity (ISO 17712)
-                </span>
-                <div className="p-3 rounded-lg border border-[#E5EBE7] dark:border-[#2D4536] bg-[#FBFCFB] dark:bg-[#14261C] flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-[#8A968E] text-[11px]">Mechanical Bolt Seal #</span>
-                    <div className="font-mono font-semibold text-[#1A2E23] dark:text-white">
-                      NG-SEAL-ISO-{selectedShipment.container_id.replace(/\D/g, '') || '88902'}
-                    </div>
-                  </div>
-                  <span className="font-mono text-[#2D6A4F] dark:text-[#86EFAC] font-semibold">
-                    ● Verified Intact
-                  </span>
                 </div>
               </div>
             </>

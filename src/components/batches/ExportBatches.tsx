@@ -20,10 +20,11 @@ import {
 } from '@phosphor-icons/react';
 import { generateOfficialEudrAnnexIIGeoJson, downloadGeoJsonFile } from '../../utils/eudrEngine';
 import { AuditDossierModal } from './AuditDossierModal';
+import { documentsForBatch } from '../../utils/auditDossierGenerator';
 import { FieldBatchesPanel } from './FieldBatchesPanel';
 
 export const ExportBatches: React.FC = () => {
-  const { batches, farmers, overrideBatchValidation } = useData();
+  const { batches, farmers, documents, overrideBatchValidation } = useData();
   const { canCertifyBatches } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState<'All' | 'Validated' | 'Incomplete' | 'Flagged'>('All');
@@ -336,43 +337,43 @@ export const ExportBatches: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-[#5A6B60] dark:text-[#8A968E] leading-relaxed">
-                  Packages official NAQS Phytosanitary Certificate, SGS GC-MS/MS Lab Assay, EUDR Annex II GeoJSON, and ocean container bolt seal.
+                  Bundles the batch summary, plot boundaries and any uploaded certificates and lab reports, with checksums.
                 </p>
                 <button
                   onClick={() => setDossierModalBatch(activeDetailBatch)}
                   className="w-full py-2.5 px-3 rounded-lg bg-[#1A4D2E] hover:bg-[#0F3320] text-white text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-warm-card"
                 >
                   <Package size={16} />
-                  <span>Download Customs Audit Dossier (.ZIP)</span>
+                  <span>Open Batch Evidence Pack</span>
                 </button>
               </div>
 
-              {/* Statutory Verification Checklist */}
+              {/* Documents actually uploaded for this batch */}
               <div className="space-y-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-[#8A968E]">
-                  Statutory Clearance Verification
+                  Uploaded documents for this batch
                 </span>
                 <div className="border border-[#E5EBE7] dark:border-[#2D4536] rounded-lg divide-y divide-[#E5EBE7] dark:divide-[#2D4536] text-xs">
-                  <div className="p-2.5 flex items-center justify-between">
-                    <span className="text-[#1A2E23] dark:text-[#E8F0EA]">EUDR Annex II Due Diligence GeoJSON</span>
-                    <span className="font-mono text-[#2D6A4F] dark:text-[#86EFAC] font-medium">Cleared</span>
-                  </div>
-                  <div className="p-2.5 flex items-center justify-between">
-                    <span className="text-[#1A2E23] dark:text-[#E8F0EA]">NAQS Official Phytosanitary Stamp</span>
-                    <span className="font-mono text-[#2D6A4F] dark:text-[#86EFAC] font-medium">Verified (60d)</span>
-                  </div>
-                  <div className="p-2.5 flex items-center justify-between">
-                    <span className="text-[#1A2E23] dark:text-[#E8F0EA]">SGS MRL Assay (Chlorpyrifos &lt;0.005 mg/kg)</span>
-                    <span className="font-mono text-[#2D6A4F] dark:text-[#86EFAC] font-medium">Passed EC 396</span>
-                  </div>
-                  <div className="p-2.5 flex items-center justify-between">
-                    <span className="text-[#1A2E23] dark:text-[#E8F0EA]">ISO 17712 Container Bolt Seal</span>
-                    <span className="font-mono text-[#2D6A4F] dark:text-[#86EFAC] font-medium">Intact</span>
-                  </div>
+                  {(() => {
+                    const linkedDocs = documentsForBatch(activeDetailBatch, documents);
+                    if (linkedDocs.length === 0) {
+                      return (
+                        <div className="p-2.5 text-[#5A6B60] dark:text-[#A1B3A7]">
+                          None yet. Upload the phytosanitary certificate and lab report in the Documents Vault.
+                        </div>
+                      );
+                    }
+                    return linkedDocs.map((d) => (
+                      <div key={d.id} className="p-2.5 flex items-center justify-between gap-2">
+                        <span className="text-[#1A2E23] dark:text-[#E8F0EA]">{d.title}</span>
+                        <span className="font-mono text-[#5A6B60] dark:text-[#A1B3A7]">{d.verification_status}</span>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
 
-              {/* QR Code Passport & Merkle Digest */}
+              {/* QR Code Passport and batch digest */}
               <div className="p-3.5 rounded-lg border border-[#E5EBE7] dark:border-[#2D4536] bg-[#FBFCFB] dark:bg-[#14261C] flex items-center gap-4">
                 {qrCodeDataUrl ? (
                   <img

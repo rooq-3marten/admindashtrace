@@ -204,8 +204,8 @@ export const AuditDossierModal: React.FC<AuditDossierModalProps> = ({ batch, isO
                       </span>
                     )}
                     {d.hash_matches === false && (
-                      <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-300">
-                        <AlertTriangle className="w-3.5 h-3.5" /> File does not match its stored checksum
+                      <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Stored checksum differs from the file (older upload method). File SHA-256 is in the manifest.
                       </span>
                     )}
                     {d.hash_matches === null && (
