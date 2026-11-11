@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { computeFileSha256 } from '../../utils/crypto';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { RegulatoryDocument, DocumentCategory, DocumentStatus } from '../../types';
@@ -62,7 +63,7 @@ export const DocumentsVault: React.FC = () => {
   const [uploadIssueDate, setUploadIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [uploadExpiryDate, setUploadExpiryDate] = useState('');
   const [uploadNotes, setUploadNotes] = useState('');
-  const [uploadFile, setUploadFile] = useState<{ name: string; size: number; type: string; base64?: string } | null>(null);
+  const [uploadFile, setUploadFile] = useState<{ name: string; size: number; type: string; base64?: string; sha256?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Verification Form State
@@ -109,12 +110,19 @@ export const DocumentsVault: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
+      let sha256: string | undefined;
+      try {
+        sha256 = await computeFileSha256(file); // checksum of the file's own bytes
+      } catch {
+        sha256 = undefined;
+      }
       setUploadFile({
         name: file.name,
         size: file.size,
         type: file.type || 'application/pdf',
         base64: event.target?.result as string,
+        sha256,
       });
       if (!uploadTitle) {
         setUploadTitle(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
@@ -152,6 +160,7 @@ export const DocumentsVault: React.FC = () => {
         file_size_bytes: uploadFile?.size || 312000,
         mime_type: uploadFile?.type || 'application/pdf',
         file_data_url: uploadFile?.base64,
+        tamper_proof_sha256: uploadFile?.sha256,
         regulatory_authority: uploadAuthority.trim() || 'NAFDAC / Federal Quarantine Service (NAQS)',
         certificate_number: uploadCertNumber.trim() || `CERT-${Math.floor(10000 + Math.random() * 90000)}`,
         issue_date: uploadIssueDate,
@@ -224,7 +233,6 @@ export const DocumentsVault: React.FC = () => {
       cryptographic_integrity: {
         tamper_proof_sha256: doc.tamper_proof_sha256,
         hash_algorithm: 'SHA-256',
-        signature_scheme: 'ECDSA_P256_SHA256',
         verifiable_qr_payload: `TRACEHARVEST:DOC:${doc.id}:${doc.tamper_proof_sha256.substring(0, 16)}`,
       },
       provenance: {
