@@ -20,17 +20,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   // Dynamic 30-day enrollment trajectory
   const trendPoints = useMemo(() => {
-    if (farmers.length === 0) {
-      return [
-        { date: '1 Sep', value: 120 },
-        { date: '6 Sep', value: 240 },
-        { date: '12 Sep', value: 410 },
-        { date: '18 Sep', value: 680 },
-        { date: '24 Sep', value: 920 },
-        { date: '30 Sep', value: 1140 },
-        { date: 'Today', value: 1247 },
-      ];
-    }
+    if (farmers.length === 0) return [] as { date: string; value: number }[];
     const sorted = [...farmers].sort((a, b) => a.created_at_epoch_ms - b.created_at_epoch_ms);
     const intervals = 8;
     const minTime = sorted[0].created_at_epoch_ms;
@@ -52,7 +42,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   // Compute SVG coordinates
   const svgCoords = trendPoints.map((pt, idx) => {
-    const x = (idx / (trendPoints.length - 1)) * (chartWidth - 80) + 50;
+    const x = (idx / Math.max(1, trendPoints.length - 1)) * (chartWidth - 80) + 50;
     const y = chartHeight - (pt.value / maxVal) * (chartHeight - 40) - 20;
     return { ...pt, x, y };
   });
@@ -67,7 +57,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     return `${acc} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${curr.x} ${curr.y}`;
   }, '');
 
-  const areaD = `${pathD} L ${svgCoords[svgCoords.length - 1].x} ${chartHeight - 10} L ${svgCoords[0].x} ${chartHeight - 10} Z`;
+  const areaD = svgCoords.length > 0 ? `${pathD} L ${svgCoords[svgCoords.length - 1].x} ${chartHeight - 10} L ${svgCoords[0].x} ${chartHeight - 10} Z` : '';
 
   // Action items
   const incompleteBatches = batches.filter((b) => b.export_clearance_status === 'PENDING_CLEARANCE');
@@ -75,6 +65,37 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     (a) => a.active_status === 'offline' || Date.now() - a.last_sync_epoch_ms > 24 * 3600 * 1000
   );
   const openDisputes = disputes ? disputes.filter((d) => d.status === 'Open') : [];
+  const farmersWithoutBoundary = farmers.filter(
+    (f) => (f.gps_polygon || '').split(';').filter((p) => p.trim().length > 0).length < 3
+  );
+  const practicesToReview = practices.filter((p) => !p.nafdac_approved || p.risk_level !== 'COMPLIANT');
+
+  const attentionItems: { key: string; text: string; detail?: string; action: string; tab: TabType; tone: 'red' | 'amber' }[] = [];
+  if (incompleteBatches.length > 0)
+    attentionItems.push({ key: 'batches', text: `${incompleteBatches.length} batch${incompleteBatches.length === 1 ? '' : 'es'} pending clearance`, action: 'Review', tab: 'batches', tone: 'red' });
+  if (practicesToReview.length > 0)
+    attentionItems.push({ key: 'practices', text: `${practicesToReview.length} logged practice${practicesToReview.length === 1 ? '' : 's'} flagged or using unapproved products`, action: 'Inspect', tab: 'data_quality', tone: 'red' });
+  if (openDisputes.length > 0)
+    attentionItems.push({ key: 'disputes', text: `${openDisputes.length} open land dispute${openDisputes.length === 1 ? '' : 's'}`, action: 'Resolve', tab: 'disputes', tone: 'red' });
+  if (staleAgents.length > 0)
+    attentionItems.push({
+      key: 'agents',
+      text: `${staleAgents.length} field agent${staleAgents.length === 1 ? '' : 's'} offline or not synced in 24 hours`,
+      detail: staleAgents.slice(0, 3).map((a) => a.name || a.agent_id).join(', '),
+      action: 'View',
+      tab: 'fleet',
+      tone: 'amber',
+    });
+  if (farmersWithoutBoundary.length > 0)
+    attentionItems.push({ key: 'boundary', text: `${farmersWithoutBoundary.length} farmer${farmersWithoutBoundary.length === 1 ? '' : 's'} without a mapped boundary (needed for EUDR)`, action: 'Inspect', tab: 'eudr_engine', tone: 'amber' });
+
+  const timeAgo = (ms: number) => {
+    const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+    if (mins < 60) return `${mins} min ago`;
+    if (mins < 1440) return `${Math.round(mins / 60)} h ago`;
+    return `${Math.round(mins / 1440)} d ago`;
+  };
+  const recentSyncs = [...syncLogs].sort((a, b) => b.server_timestamp_ms - a.server_timestamp_ms).slice(0, 5);
 
   return (
     <div className="space-y-7 max-w-[1400px] mx-auto animate-in fade-in duration-150">
@@ -94,7 +115,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#2D6A4F] dark:text-[#86EFAC]">
-            <span>↑ {farmers.filter((f) => Date.now() - f.created_at_epoch_ms < 86400000).length || 23} enrolled today</span>
+            <span>↑ {farmers.filter((f) => Date.now() - f.created_at_epoch_ms < 86400000).length} enrolled in the last 24 h</span>
           </div>
         </div>
 
@@ -112,7 +133,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#2D6A4F] dark:text-[#86EFAC]">
-            <span>{stats.certifiedBatchesCount} lots cleared for export</span>
+            <span>{stats.certifiedBatchesCount} marked cleared in the dashboard</span>
           </div>
         </div>
 
@@ -130,7 +151,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#4A6FA5] dark:text-[#93C5FD]">
-            <span>Rotterdam & Hamburg routes</span>
+            <span>Shipments marked In Transit</span>
           </div>
         </div>
 
@@ -140,7 +161,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           className="lg:col-span-3 p-5 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-warm-card hover:border-[#D1DBD5] transition-all cursor-pointer flex flex-col justify-between"
         >
           <span className="text-[13px] font-medium text-[#5A6B60] dark:text-[#A1B3A7]">
-            Sync health
+            Agents synced (48 h)
           </span>
           <div className="my-2">
             <span className="text-[34px] font-mono font-bold text-[#1A2E23] dark:text-white tabular-nums leading-tight">
@@ -149,231 +170,81 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#2D6A4F] dark:text-[#86EFAC]">
             <span className="w-2 h-2 rounded-full bg-[#2D6A4F]" />
-            <span>{stats.activeAgentsCount} agents syncing live</span>
+            <span>{stats.activeAgentsCount} of {agents.length} agents online now</span>
           </div>
         </div>
       </div>
 
-      {/* SECTION 2: NEEDS YOUR ATTENTION (Warm, direct, not alarmist) */}
+      {/* SECTION 2: NEEDS YOUR ATTENTION (computed from live records only) */}
       <div className="p-6 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-warm-card">
-        <div className="flex items-center justify-between pb-4 border-b border-[#E5EBE7] dark:border-[#2D4536]">
-          <div>
-            <h2 className="font-serif font-bold text-lg text-[#1A2E23] dark:text-white tracking-tight">
-              Needs your attention
-            </h2>
-            <p className="text-xs text-[#5A6B60] dark:text-[#8A968E] mt-0.5">
-              Items requiring administrative review before consignment dispatch
-            </p>
-          </div>
-          <button
-            onClick={() => setActiveTab('data_quality')}
-            className="text-xs font-semibold text-[#1A4D2E] dark:text-[#86EFAC] hover:underline cursor-pointer"
-          >
-            See all items →
-          </button>
+        <div className="pb-4 border-b border-[#E5EBE7] dark:border-[#2D4536]">
+          <h2 className="font-serif font-bold text-lg text-[#1A2E23] dark:text-white tracking-tight">Needs your attention</h2>
+          <p className="text-xs text-[#5A6B60] dark:text-[#8A968E] mt-0.5">Counted from the records currently loaded</p>
         </div>
-
         <div className="divide-y divide-[#E5EBE7] dark:divide-[#2D4536] text-sm">
-          {/* Item 1 */}
-          <div className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#A63A2E] mt-2 shrink-0" />
-              <div>
-                <span className="font-medium text-[#1A2E23] dark:text-[#F1F5F9]">
-                  {incompleteBatches.length > 0 ? `${incompleteBatches.length} batches have pending compliance clearance` : '3 export lots awaiting review'}
-                </span>
-                <p className="text-[12px] text-[#8A968E] mt-0.5">
-                  Kano & Jigawa aggregation hubs · 2 hours ago
-                </p>
+          {attentionItems.length === 0 && (
+            <p className="py-4 text-[#5A6B60] dark:text-[#A1B3A7]">Nothing needs attention in the records currently loaded.</p>
+          )}
+          {attentionItems.map((item) => (
+            <div key={item.key} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className={`w-2 h-2 rounded-full mt-2 shrink-0 ${item.tone === 'red' ? 'bg-[#A63A2E]' : 'bg-[#B8860B]'}`} />
+                <div>
+                  <span className="font-medium text-[#1A2E23] dark:text-[#F1F5F9]">{item.text}</span>
+                  {item.detail && <p className="text-[12px] text-[#8A968E] mt-0.5">{item.detail}</p>}
+                </div>
               </div>
+              <button
+                onClick={() => setActiveTab(item.tab)}
+                className="text-xs font-semibold text-[#1A4D2E] dark:text-[#86EFAC] hover:underline cursor-pointer flex items-center gap-1 self-start sm:self-center"
+              >
+                {item.action} <span aria-hidden="true">→</span>
+              </button>
             </div>
-            <button
-              onClick={() => setActiveTab('batches')}
-              className="text-xs font-semibold text-[#1A4D2E] dark:text-[#86EFAC] hover:underline cursor-pointer flex items-center gap-1 self-start sm:self-center"
-            >
-              Review <span aria-hidden="true">→</span>
-            </button>
-          </div>
-
-          {/* Item 2 */}
-          <div className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#B8860B] mt-2 shrink-0" />
-              <div>
-                <span className="font-medium text-[#1A2E23] dark:text-[#F1F5F9]">
-                  {staleAgents.length > 0 ? `${staleAgents.length} field enumerators haven't synced in 48 hours` : '2 agents haven\'t synced recently'}
-                </span>
-                <p className="text-[12px] text-[#8A968E] mt-0.5">
-                  Fatima Bello (Kano), Emeka Nwosu (Benue) · 1 day ago
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('fleet')}
-              className="text-xs font-semibold text-[#1A4D2E] dark:text-[#86EFAC] hover:underline cursor-pointer flex items-center gap-1 self-start sm:self-center"
-            >
-              Notify <span aria-hidden="true">→</span>
-            </button>
-          </div>
-
-          {/* Item 3 */}
-          <div className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#A63A2E] mt-2 shrink-0" />
-              <div>
-                <span className="font-medium text-[#1A2E23] dark:text-[#F1F5F9]">
-                  {openDisputes.length > 0 ? `${openDisputes.length} smallholder land title disputes logged` : '1 farmer boundary clarification required'}
-                </span>
-                <p className="text-[12px] text-[#8A968E] mt-0.5">
-                  Abubakar Ali (Dambatta plot, Kano) · 4 hours ago
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('disputes')}
-              className="text-xs font-semibold text-[#1A4D2E] dark:text-[#86EFAC] hover:underline cursor-pointer flex items-center gap-1 self-start sm:self-center"
-            >
-              Resolve <span aria-hidden="true">→</span>
-            </button>
-          </div>
-
-          {/* Item 4 */}
-          <div className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#B8860B] mt-2 shrink-0" />
-              <div>
-                <span className="font-medium text-[#1A2E23] dark:text-[#F1F5F9]">
-                  Annex II plot polygon verification needed for new enrollments
-                </span>
-                <p className="text-[12px] text-[#8A968E] mt-0.5">
-                  Hadiza Musa, Terna Ior (Jigawa & Benue smallholder clusters)
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('eudr_engine')}
-              className="text-xs font-semibold text-[#1A4D2E] dark:text-[#86EFAC] hover:underline cursor-pointer flex items-center gap-1 self-start sm:self-center"
-            >
-              Inspect <span aria-hidden="true">→</span>
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* SECTION 3: TWO COLUMN LAYOUT — WHAT'S HAPPENING & SYSTEM HEALTH */}
+      {/* SECTION 3: RECENT SYNCS & DATA COVERAGE */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* What's happening (Recent Activity with dashed separators) */}
         <div className="p-6 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-warm-card space-y-4">
           <div className="pb-3 border-b border-[#E5EBE7] dark:border-[#2D4536] flex items-center justify-between">
-            <h3 className="font-serif font-bold text-base text-[#1A2E23] dark:text-white">
-              What's happening
-            </h3>
-            <span className="text-[12px] font-mono text-[#8A968E]">
-              Ingestion feed
-            </span>
+            <h3 className="font-serif font-bold text-base text-[#1A2E23] dark:text-white">Recent syncs</h3>
+            <span className="text-[12px] font-mono text-[#8A968E]">From the sync log</span>
           </div>
-
-          <div className="space-y-4 text-xs">
-            {syncLogs.length > 0 && (
-              <div className="pb-3 border-b border-dashed border-[#E5EBE7] dark:border-[#2D4536] flex items-start gap-3">
+          <div className="space-y-3 text-xs">
+            {recentSyncs.length === 0 && <p className="text-[#5A6B60] dark:text-[#A1B3A7]">No syncs recorded yet.</p>}
+            {recentSyncs.map((log, i) => (
+              <div key={log.id || i} className="pb-3 border-b border-dashed border-[#E5EBE7] dark:border-[#2D4536] last:border-0 flex items-start gap-3">
                 <span className="w-2 h-2 rounded-full bg-[#1A4D2E] mt-1 shrink-0" />
                 <div className="space-y-0.5">
                   <p className="text-[#1A2E23] dark:text-[#F1F5F9] font-medium leading-relaxed">
-                    Field agent <strong className="font-mono text-[#1A4D2E] dark:text-[#86EFAC]">{syncLogs[0].agent_id}</strong> synced {syncLogs[0].farmers_count} smallholders and {syncLogs[0].practices_count} chemical logs.
+                    <strong className="font-mono">{log.agent_id}</strong> synced {log.farmers_count} farmer{log.farmers_count === 1 ? '' : 's'} and {log.practices_count} practice{log.practices_count === 1 ? '' : 's'}
                   </p>
-                  <p className="text-[11px] text-[#8A968E]">
-                    {Math.max(1, Math.round((Date.now() - syncLogs[0].server_timestamp_ms) / 60000))} minutes ago · Kano aggregation point
-                  </p>
+                  <p className="text-[11px] text-[#8A968E]">{timeAgo(log.server_timestamp_ms)} · {log.status}</p>
                 </div>
               </div>
-            )}
-
-            <div className="pb-3 border-b border-dashed border-[#E5EBE7] dark:border-[#2D4536] flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#2D6A4F] mt-1 shrink-0" />
-              <div className="space-y-0.5">
-                <p className="text-[#1A2E23] dark:text-[#F1F5F9] font-medium leading-relaxed">
-                  Smallholder <strong>Ngozi Eze</strong> enrolled with verified GPS plot polygon in Benue State.
-                </p>
-                <p className="text-[11px] text-[#8A968E]">
-                  1 hour ago · Soybeans cluster
-                </p>
-              </div>
-            </div>
-
-            <div className="pb-3 border-b border-dashed border-[#E5EBE7] dark:border-[#2D4536] flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#4A6FA5] mt-1 shrink-0" />
-              <div className="space-y-0.5">
-                <p className="text-[#1A2E23] dark:text-[#F1F5F9] font-medium leading-relaxed">
-                  Export batch <strong className="font-mono text-slate-800 dark:text-slate-200">BATCH-KN-2026-1187</strong> (42.50 MT Sesame) loaded onto vessel CMA CGM Africa One.
-                </p>
-                <p className="text-[11px] text-[#8A968E]">
-                  3 hours ago · Lagos Apapa Port
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <span className="w-2 h-2 rounded-full bg-[#2D6A4F] mt-1 shrink-0" />
-              <div className="space-y-0.5">
-                <p className="text-[#1A2E23] dark:text-[#F1F5F9] font-medium leading-relaxed">
-                  NAQS Phytosanitary certificate issued for consignment lot 0042. Chlorpyrifos &lt;0.005 mg/kg confirmed.
-                </p>
-                <p className="text-[11px] text-[#8A968E]">
-                  5 hours ago · SGS Testing Laboratory
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* System health (Calm, factual, not alarmist) */}
         <div className="p-6 rounded-xl bg-white dark:bg-[#1A2E23] border border-[#E5EBE7] dark:border-[#2D4536] shadow-warm-card space-y-4">
-          <div className="pb-3 border-b border-[#E5EBE7] dark:border-[#2D4536] flex items-center justify-between">
-            <h3 className="font-serif font-bold text-base text-[#1A2E23] dark:text-white">
-              System health
-            </h3>
-            <span className="text-[12px] text-[#5A6B60] dark:text-[#8A968E]">
-              All core services operating
-            </span>
+          <div className="pb-3 border-b border-[#E5EBE7] dark:border-[#2D4536]">
+            <h3 className="font-serif font-bold text-base text-[#1A2E23] dark:text-white">Data coverage</h3>
           </div>
-
           <div className="space-y-2.5 text-xs">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C]">
-              <span className="font-medium text-[#1A2E23] dark:text-white">Traceability Ingestion API</span>
-              <div className="flex items-center gap-1.5 font-medium text-[#2D6A4F] dark:text-[#86EFAC]">
-                <span className="w-2 h-2 rounded-full bg-[#2D6A4F]" />
-                <span>Healthy</span>
+            {[
+              ['Farmers with a mapped boundary', `${farmers.length - farmersWithoutBoundary.length} of ${farmers.length}`],
+              ['Practices logged', String(practices.length)],
+              ['Practices flagged or unapproved', String(practicesToReview.length)],
+              ['Agents online now', `${stats.activeAgentsCount} of ${agents.length}`],
+              ['Last sync received', syncLogs.length > 0 ? timeAgo(Math.max(...syncLogs.map((l) => l.server_timestamp_ms))) : 'None yet'],
+            ].map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C]">
+                <span className="font-medium text-[#1A2E23] dark:text-white">{label}</span>
+                <span className="font-mono font-semibold text-[#1A2E23] dark:text-white">{value}</span>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C]">
-              <span className="font-medium text-[#1A2E23] dark:text-white">PostgreSQL & GIS Geometries</span>
-              <div className="flex items-center gap-1.5 font-medium text-[#2D6A4F] dark:text-[#86EFAC]">
-                <span className="w-2 h-2 rounded-full bg-[#2D6A4F]" />
-                <span>Healthy</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C]">
-              <span className="font-medium text-[#1A2E23] dark:text-white">USSD Enumeration Gateway</span>
-              <div className="flex items-center gap-1.5 font-medium text-[#2D6A4F] dark:text-[#86EFAC]">
-                <span className="w-2 h-2 rounded-full bg-[#2D6A4F]" />
-                <span>Healthy</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F7F9F7] dark:bg-[#14261C]">
-              <span className="font-medium text-[#1A2E23] dark:text-white">SMS Notification Gateway</span>
-              <div className="flex items-center gap-1.5 font-medium text-[#B8860B] dark:text-[#FCD34D]">
-                <span className="w-2 h-2 rounded-full bg-[#B8860B]" />
-                <span>Minor queue delay</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-[#E5EBE7] dark:border-[#2D4536] flex items-center justify-between text-xs text-[#5A6B60] dark:text-[#8A968E]">
-            <span>Uptime (30 days): <strong className="text-[#1A2E23] dark:text-white font-mono">99.96%</strong></span>
-            <span>Last checked 30 seconds ago</span>
+            ))}
           </div>
         </div>
       </div>
@@ -386,7 +257,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               Enrollment trajectory
             </h3>
             <p className="text-xs text-[#5A6B60] dark:text-[#8A968E]">
-              Smallholders onboarding across Kano, Benue, and Jigawa clusters
+              Cumulative smallholders enrolled over time
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -396,14 +267,17 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
         </div>
 
+        {trendPoints.length === 0 && (
+          <p className="text-xs text-[#5A6B60] dark:text-[#A1B3A7]">No farmers enrolled yet.</p>
+        )}
         {/* SVG Chart with dashed gridlines and subtle area fill */}
-        <div className="relative pt-2 overflow-x-auto">
+        {trendPoints.length > 0 && (<div className="relative pt-2 overflow-x-auto">
           <svg
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             className="w-full h-48 select-none"
           >
             {/* Dashed Horizontal Gridlines */}
-            {[0, 250, 500, 750, 1000, 1250].map((v) => {
+            {[0, 1, 2, 3, 4].map((i) => Math.round((maxVal * i) / 4)).map((v) => {
               const y = chartHeight - (v / maxVal) * (chartHeight - 40) - 20;
               return (
                 <g key={v}>
@@ -457,13 +331,6 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               />
             ))}
 
-            {/* Hand-drawn Annotation */}
-            <g transform={`translate(${chartWidth - 210}, 30)`}>
-              <rect x="0" y="0" width="160" height="24" rx="4" fill="#FFFFFF" stroke="#E5EBE7" />
-              <text x="8" y="16" className="text-[11px] fill-[#5A6B60] font-sans">
-                ✦ Harvest season begins
-              </text>
-            </g>
           </svg>
 
           {/* X-Axis Dates */}
@@ -487,7 +354,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="text-[10px] text-[#8A968E]">{hoveredTrendPoint.date}</div>
             </div>
           )}
-        </div>
+        </div>)}
       </div>
     </div>
   );
