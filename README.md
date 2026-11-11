@@ -21,7 +21,7 @@ TraceHarvest is the national agricultural traceability and compliance operations
 * **Audit Trail Sentinel**:
   * Cryptographically tracked and persistent audit log capturing every administrative action (`self_register`, `approve`, `reject`, `suspend`, `reinstate`).
 * **EUDR Geospatial & PHI Compliance**:
-  * GeoJSON plot boundary validation with Copernicus satellite cross-referencing.
+  * GeoJSON plot boundary validation and Annex II export. Tree-cover loss is reviewed from recorded values only; no satellite source is connected.
   * Pre-Harvest Interval (PHI) holding periods for chemical sprays.
 * **Production Build Safeguards**:
   * Fail-fast TypeScript strict verification on every build.

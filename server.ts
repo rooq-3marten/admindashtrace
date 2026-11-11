@@ -444,7 +444,7 @@ app.post(['/sync/batch', '/api/v1/sync/upstream'], (req: Request, res: Response)
         batch_number: batchCode,
         agent_id,
         crop: b.crop || 'Sesame',
-        destination: b.destination || 'Rotterdam, Netherlands (EU)',
+        destination: b.destination || '',
         farmer_count: (b.farmer_ids || b.farmer_codes || []).length,
         total_quantity: b.total_quantity || b.estimated_tonnage || 20.0,
         estimated_tonnage: b.total_quantity || b.estimated_tonnage || 20.0,
@@ -1381,7 +1381,7 @@ app.post('/api/v1/admin/batches/create', (req: Request, res: Response) => {
     id: db.batches.length + 1,
     batch_number: batchNumber,
     crop: crop || 'Sesame',
-    destination: destination || 'Rotterdam, Netherlands (EU)',
+    destination: destination || '',
     farmer_count: farmer_client_uuids.length,
     estimated_tonnage: parseFloat(estimated_tonnage) || 20.0,
     created_at_ms: Date.now(),
@@ -2321,57 +2321,6 @@ app.post('/api/v1/eudr/detect-overlaps', (req: Request, res: Response) => {
   });
 });
 
-// 3. Automated Remote Sensing Tree-Cover Validation (Copernicus Sentinel-2 & Dec 31, 2020 Baseline)
-app.post('/api/v1/eudr/analyze-remote-sensing', (req: Request, res: Response) => {
-  const { farmer_id, state = 'Kano', farm_size_hectares = 4.5, override_loss_ha } = req.body;
-  const farmer = farmer_id ? db.farmers[farmer_id] : null;
-
-  const farmHa = farmer?.farm_size_hectares || farm_size_hectares || 4.5;
-  const farmerState = (farmer?.state || state || 'Kano').toLowerCase();
-
-  let baselineCanopyPct = 11.2;
-  if (farmerState.includes('kaduna')) baselineCanopyPct = 18.5;
-  if (farmerState.includes('benue')) baselineCanopyPct = 26.8;
-
-  let lossHa = 0.0;
-  if (typeof override_loss_ha === 'number') {
-    lossHa = override_loss_ha;
-  } else if (farmer?.official_farmer_id === 'TH-BEN-2026-5521') {
-    lossHa = 0.35; // Intentional Benue hold parcel
-  }
-
-  const isDisturbance = lossHa > 0.1;
-  const verdict = isDisturbance ? 'COMPLIANCE_REVIEW_HOLD' : 'EUDR_CERTIFIED';
-  const riskScore = isDisturbance ? Math.round(75 + (lossHa / farmHa) * 100) : 0;
-
-  const tileCode = farmerState.includes('kano') ? 'T32PQR' : farmerState.includes('jigawa') ? 'T32PQS' : farmerState.includes('kaduna') ? 'T32PMR' : 'T32NQK';
-  const acquisitionDate = '2026-03-24';
-  const tileId = `${tileCode}_20260324T095031`;
-
-  const evidencePayload = `${farmer?.client_uuid || 'plot'}_${lossHa}_${tileId}_20201231`;
-  const evidenceHash = crypto.createHash('sha256').update(evidencePayload).digest('hex');
-
-  res.json({
-    status: 'success',
-    baseline_cutoff_date: '2020-12-31',
-    forest_baseline_2020_pct: baselineCanopyPct,
-    tree_cover_loss_post_2020_ha: lossHa,
-    verdict,
-    risk_score: riskScore,
-    copernicus_sentinel_2: {
-      sensor: 'Copernicus Sentinel-2B MSI L2A',
-      tile_id: tileId,
-      pass_date: acquisitionDate,
-      cloud_cover_pct: 1.2,
-      mean_ndvi_2020: 0.63,
-      mean_ndvi_current: isDisturbance ? 0.35 : 0.62,
-    },
-    satellite_evidence_sha256: evidenceHash,
-    summary: isDisturbance
-      ? `Canopy disturbance of ${lossHa} ha detected post-Dec 31, 2020 baseline (> 0.1 ha threshold). Locked in Compliance Review Hold.`
-      : `Zero tree cover loss (0.00 ha) confirmed post-Dec 31, 2020 cutoff date. EUDR Certified.`,
-  });
-});
 
 // 4. Official EUDR Annex II GeoJSON Export Endpoint (European Commission Specification)
 app.get('/api/v1/eudr/export-annex-ii', (req: Request, res: Response) => {
