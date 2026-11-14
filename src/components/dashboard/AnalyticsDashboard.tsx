@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { TabType } from '../layout/Sidebar';
+import { practiceNeedsReview } from '../../utils/practiceReview';
 
 interface AnalyticsDashboardProps {
   setActiveTab: (tab: TabType) => void;
@@ -68,7 +69,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const farmersWithoutBoundary = farmers.filter(
     (f) => (f.gps_polygon || '').split(';').filter((p) => p.trim().length > 0).length < 3
   );
-  const practicesToReview = practices.filter((p) => !p.nafdac_approved || p.risk_level !== 'COMPLIANT');
+  const practicesToReview = practices.filter((p) => practiceNeedsReview(p));
 
   const attentionItems: { key: string; text: string; detail?: string; action: string; tab: TabType; tone: 'red' | 'amber' }[] = [];
   if (incompleteBatches.length > 0)
