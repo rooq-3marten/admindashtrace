@@ -586,43 +586,6 @@ app.get(['/sync/status/:agent_id', '/api/v1/sync/status/:agent_id'], (req: Reque
   });
 });
 
-// ==============================================================
-// 1b. Downstream Sync Endpoint (Pulled by Android App for offline cache)
-// ==============================================================
-app.get('/api/v1/sync/downstream', (req: Request, res: Response) => {
-  const { agent_id, since_epoch_ms } = req.query as { agent_id?: string; since_epoch_ms?: string };
-  const sinceMs = since_epoch_ms ? parseInt(since_epoch_ms, 10) : 0;
-
-  let farmersList = Object.values(db.farmers);
-  if (sinceMs > 0) {
-    farmersList = farmersList.filter((f: any) => (f.server_received_at || f.created_at_epoch_ms || 0) > sinceMs);
-  }
-
-  const cooperatives = Array.from(
-    new Set(Object.values(db.farmers).map((f: any) => f.cooperative_name).filter(Boolean))
-  );
-
-  res.json({
-    status: 'success',
-    server_timestamp_ms: Date.now(),
-    agent_id: agent_id || 'ALL',
-    delta_sync: sinceMs > 0,
-    farmers_count: farmersList.length,
-    farmers: farmersList,
-    nafdac_approved_products: NAFDAC_APPROVED_PRODUCTS,
-    banned_chemicals: BANNED_CHEMICALS,
-    cooperatives,
-    open_export_batches: db.batches.filter((b: any) => b.export_clearance_status !== 'FLAGGED_QUARANTINE'),
-    verified_documents: (db.documents || []).filter((d: any) => d.verification_status === 'VERIFIED_COMPLIANT'),
-    eudr_regulations: {
-      deforestation_cutoff_date: '2020-12-31',
-      polygon_required_hectare_threshold: 4.0,
-      supported_commodities: ['Sesame', 'Soybeans', 'Cocoa', 'Coffee', 'Oil Palm', 'Rubber', 'Cattle', 'Wood'],
-      geolocation_format: 'WGS84 lat,long',
-    },
-  });
-});
-
 // Sync Status & Heartbeat
 app.get('/api/v1/sync/status', (req: Request, res: Response) => {
   const farmersList = Object.values(db.farmers);
@@ -703,7 +666,6 @@ app.get('/api/v1/sync/strength-check', (req: Request, res: Response) => {
     },
     protocols: {
       upstream_endpoint: '/api/v1/sync/upstream',
-      downstream_endpoint: '/api/v1/sync/downstream',
       status_endpoint: '/api/v1/sync/status',
       ping_endpoint: '/api/v1/sync/ping',
     },
@@ -722,7 +684,6 @@ app.get('/api/v1/mobile/config', (req: Request, res: Response) => {
     gateway_url: baseUrl,
     endpoints: {
       upstream_sync: `${baseUrl}/api/v1/sync/upstream`,
-      downstream_sync: `${baseUrl}/api/v1/sync/downstream`,
       status_ping: `${baseUrl}/api/v1/sync/ping`,
       heartbeat: `${baseUrl}/api/v1/mobile/agents/heartbeat`,
     },
@@ -2089,7 +2050,7 @@ app.get(['/documents/:id/download', '/api/v1/documents/:id/download'], (req: Req
     cryptographic_integrity: {
       tamper_proof_sha256: doc.tamper_proof_sha256,
       hash_algorithm: 'SHA-256',
-      signature_scheme: 'ECDSA_P256_SHA256',
+      integrity_check: 'SHA-256 recorded at upload; no digital signature is applied',
       verifiable_qr_payload: `TRACEHARVEST:DOC:${doc.id}:${doc.tamper_proof_sha256.substring(0, 16)}`,
     },
     provenance: {
@@ -2337,15 +2298,6 @@ app.get('/api/v1/eudr/export-annex-ii', (req: Request, res: Response) => {
     const ring = valid.cleaned_coords.map((p) => [Number(p.lng.toFixed(6)), Number(p.lat.toFixed(6))]);
     ring.push([...ring[0]]); // closed ring per GeoJSON RFC 7946
 
-    const isHold = f.official_farmer_id === 'TH-BEN-2026-5521';
-    const lossHa = isHold ? 0.35 : 0.0;
-    const eudrStatus = isHold ? 'COMPLIANCE_REVIEW_HOLD' : 'EUDR_CERTIFIED';
-
-    const evidenceHash = crypto
-      .createHash('sha256')
-      .update(`${f.official_farmer_id}_${lossHa}_20201231`)
-      .digest('hex');
-
     return {
       type: 'Feature',
       id: `plot-${f.client_uuid || f.id}`,
@@ -2358,16 +2310,12 @@ app.get('/api/v1/eudr/export-annex-ii', (req: Request, res: Response) => {
         farmer_name: f.full_name || f.name,
         commodity: f.crop || f.crop_type || commodity,
         country_of_production: country,
-        administrative_region: f.state || 'Kano',
-        farm_size_hectares: f.farm_size_hectares || 4.5,
-        eudr_compliance_status: eudrStatus,
-        tree_cover_loss_post_2020_ha: lossHa,
-        tree_cover_baseline_2020_pct: 12.4,
-        sentinel2_acquisition_date: '2026-03-24',
-        sentinel2_tile_id: 'T32PQR_20260324T095031',
-        postgis_topology_status: valid.was_repaired ? 'ST_MakeValid_REPAIRED' : 'ST_MakeValid_PASSED',
-        neighbor_overlap_detected: false,
-        tamper_proof_evidence_sha256: evidenceHash,
+        administrative_region: f.state || null,
+        farm_size_hectares: f.farm_size_hectares ?? null,
+        // Satellite forest-loss checks have not been run for this plot, so none is reported.
+        eudr_compliance_status: 'NOT_ASSESSED',
+        tree_cover_loss_post_2020_ha: null,
+        geometry_repair_status: valid.was_repaired ? 'REPAIRED' : 'VALID',
       },
     };
   });
@@ -2519,15 +2467,6 @@ setTimeout(runServerSentinelCronScan, 2000);
 // Sentinel API Routes
 app.get(['/sentinel/expiry-cron', '/api/v1/sentinel/expiry-cron'], (req: Request, res: Response) => {
   res.json(lastSentinelExecution);
-});
-
-app.post(['/sentinel/cron-trigger', '/api/v1/sentinel/cron-trigger'], (req: Request, res: Response) => {
-  runServerSentinelCronScan();
-  res.json({
-    status: 'success',
-    message: 'Automated Document Expiry Sentinel cron triggered successfully',
-    execution: lastSentinelExecution,
-  });
 });
 
 // ==============================================================
