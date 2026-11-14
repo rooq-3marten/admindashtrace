@@ -1,12 +1,13 @@
 import React from 'react';
 import { useData } from '../../context/DataContext';
 import { Flag, AlertTriangle, ShieldCheck, CheckCircle2, Download, AlertOctagon } from 'lucide-react';
+import { practiceNeedsReview } from '../../utils/practiceReview';
 
 export const QualityFlagsView: React.FC = () => {
   const { practices, updatePracticeRisk } = useData();
 
   const flagged = practices.filter(
-    (p) => !p.nafdac_approved || p.risk_level === 'FLAGGED_HIGH_RISK'
+    (p) => practiceNeedsReview(p)
   );
 
   return (
@@ -48,10 +49,10 @@ export const QualityFlagsView: React.FC = () => {
                     {p.farmer_code}
                   </td>
                   <td className="py-3.5 px-4 font-semibold text-red-600 dark:text-red-400">
-                    {p.product_name}
+                    {p.product_name || p.practice_type}
                   </td>
                   <td className="py-3.5 px-4 text-[#6B7280] dark:text-[#94A3B8]">
-                    {p.active_ingredient}
+                    {p.active_ingredient || '—'}
                   </td>
                   <td className="py-3.5 px-4 font-mono">
                     {new Date(p.date_applied_epoch_ms).toLocaleDateString()}

@@ -14,6 +14,7 @@ import {
   X,
   Filter,
 } from 'lucide-react';
+import { practiceNeedsReview } from '../../utils/practiceReview';
 
 export const DataQualityDashboard: React.FC = () => {
   const { farmers, practices, batches, agents } = useData();
@@ -46,7 +47,7 @@ export const DataQualityDashboard: React.FC = () => {
 
   // 3. Unapproved Products
   const unapprovedPractices = useMemo(() => {
-    return practices.filter((p: PracticeLog) => !p.nafdac_approved || p.risk_level === 'FLAGGED_HIGH_RISK');
+    return practices.filter((p: PracticeLog) => practiceNeedsReview(p));
   }, [practices]);
 
   const unapprovedProductNames = useMemo(() => {
