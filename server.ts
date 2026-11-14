@@ -1084,7 +1084,7 @@ app.get('/api/v1/admin/registered-agents', (req: Request, res: Response) => {
 // 5. Admin Approve Agent Endpoint
 app.patch('/api/v1/admin/agents/:id/approve', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { reviewed_by = 'Chief Compliance Director' } = req.body;
+  const { reviewed_by = 'Unattributed reviewer' } = req.body;
 
   const agent = db.agents?.[id] || Object.values(db.agents || {}).find((a: any) => a.id === id || a.agent_id === id);
   if (!agent) {
@@ -1135,7 +1135,7 @@ app.patch('/api/v1/admin/agents/:id/approve', async (req: Request, res: Response
 // 6. Admin Reject Agent Endpoint (Rejection Reason is strictly REQUIRED)
 app.patch('/api/v1/admin/agents/:id/reject', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { rejection_reason, reviewed_by = 'Chief Compliance Director' } = req.body;
+  const { rejection_reason, reviewed_by = 'Unattributed reviewer' } = req.body;
 
   if (!rejection_reason || typeof rejection_reason !== 'string' || rejection_reason.trim().length === 0) {
     return res.status(400).json({
@@ -1195,7 +1195,7 @@ app.patch('/api/v1/admin/agents/:id/reject', async (req: Request, res: Response)
 // 7. Admin Suspend Agent Endpoint
 app.patch('/api/v1/admin/agents/:id/suspend', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { reason = 'Operational review hold', reviewed_by = 'Chief Compliance Director' } = req.body;
+  const { reason = 'Operational review hold', reviewed_by = 'Unattributed reviewer' } = req.body;
 
   const agent = db.agents?.[id] || Object.values(db.agents || {}).find((a: any) => a.id === id || a.agent_id === id);
   if (!agent) {
@@ -1246,7 +1246,7 @@ app.patch('/api/v1/admin/agents/:id/suspend', async (req: Request, res: Response
 // 8. Admin Reinstate Agent Endpoint
 app.patch('/api/v1/admin/agents/:id/reinstate', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { reviewed_by = 'Chief Compliance Director' } = req.body;
+  const { reviewed_by = 'Unattributed reviewer' } = req.body;
 
   const agent = db.agents?.[id] || Object.values(db.agents || {}).find((a: any) => a.id === id || a.agent_id === id);
   if (!agent) {
