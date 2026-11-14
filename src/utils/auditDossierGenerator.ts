@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
 import { ExportBatch, Farmer, PracticeLog, RegulatoryDocument, Shipment } from '../types';
 import { analyzeRemoteSensingTreeCover, generateOfficialEudrAnnexIIGeoJson } from './eudrEngine';
+import { practiceNeedsReview } from './practiceReview';
 
 /**
  * Batch Evidence Pack.
@@ -389,7 +390,7 @@ export async function buildCompleteAuditDossier(
     farmers: linked.length,
     farmersWithPolygon: linked.filter((f) => polygonPointCount(f) >= 3).length,
     practices: logs.length,
-    practicesNeedingReview: logs.filter((p) => !p.nafdac_approved || p.risk_level !== 'COMPLIANT').length,
+    practicesNeedingReview: logs.filter((p) => practiceNeedsReview(p)).length,
     plotsWithRecordedLossFigure: rs.filter((r) => r.basis === 'RECORDED_VALUE').length,
     plotsOnReviewHold: rs.filter((r) => r.eudr_compliance_verdict === 'COMPLIANCE_REVIEW_HOLD').length,
     documentsAttached: attached.length,
