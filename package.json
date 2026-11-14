@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "tsx server.ts",
-    "build": "tsc --noEmit && vite build && node scripts/verify-build.js",
+    "build": "vite build && node scripts/verify-build.js",
+    "typecheck": "tsc --noEmit",
     "verify": "node scripts/verify-build.js",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

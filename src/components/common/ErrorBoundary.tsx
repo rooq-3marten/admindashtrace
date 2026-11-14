@@ -58,14 +58,14 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <h2 className="text-xl font-bold text-[#1A2E23] dark:text-white mb-2">
-              {this.props.fallbackTitle || 'Component Encountered an Unexpected Error'}
+              {this.props.fallbackTitle || 'Something went wrong on this page'}
             </h2>
 
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-              TraceHarvest safeguards protected your session from crashing. The error has been captured safely.
+              Your session and data are safe. Try again, or reload the portal if the problem continues.
             </p>
 
-            {this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <div className="text-left bg-gray-50 dark:bg-[#0d1a13] p-3 rounded-lg mb-6 border border-gray-200 dark:border-gray-800 text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto max-h-36">
                 <span className="font-semibold text-red-600 dark:text-red-400">{this.state.error.name}: </span>
                 {this.state.error.message}

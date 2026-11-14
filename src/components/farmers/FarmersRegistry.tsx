@@ -278,7 +278,7 @@ export const FarmersRegistry: React.FC = () => {
                       {farmer.crop}
                     </td>
                     <td className="py-3.5 px-4 font-mono font-medium">
-                      {farmer.total_plots_count ?? '—'}
+                      {batches.filter((b) => b.farmer_client_uuids?.includes(farmer.client_uuid)).length}
                     </td>
                     <td className="py-3.5 px-4 text-[#6B7280] dark:text-[#94A3B8]">
                       {agents.find((a) => a.agent_id === farmer.agent_id)?.name ?? farmer.agent_id ?? '—'}

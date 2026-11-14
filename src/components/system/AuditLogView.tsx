@@ -3,6 +3,7 @@ import { Download, ArrowClockwise, Warning, Info } from '@phosphor-icons/react';
 import { apiFetch } from '../../lib/apiFetch';
 import { AgentAuditLog } from '../../types';
 import { AdminSignInLog } from './AdminSignInLog';
+import { friendlyError } from '../../lib/friendlyError';
 
 const FETCH_LIMIT = 500;
 
@@ -74,7 +75,7 @@ export const AuditLogView: React.FC = () => {
       setLogs(data as AgentAuditLog[]);
       setState('ready');
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Could not reach the server.');
+      setErrorMessage(friendlyError(err, 'load this page'));
       setState('error');
     }
   }, []);

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowClockwise, Warning } from '@phosphor-icons/react';
 import { apiFetch } from '../../lib/apiFetch';
+import { friendlyError } from '../../lib/friendlyError';
 
 // Shape of GET /api/v1/sync/status. Nothing outside these fields is shown as a measured value.
 interface SyncStatusResponse {
@@ -65,7 +66,7 @@ export const SystemHealthDashboard: React.FC = () => {
       setErrorMessage('');
       setState('ready');
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Could not reach the server.');
+      setErrorMessage(friendlyError(err, 'load this page'));
       setState('error');
     }
   }, []);

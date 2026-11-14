@@ -35,6 +35,7 @@ import { useAuth } from '../../context/AuthContext';
 import { RegisteredAgent, AgentStatus } from '../../types';
 import { apiFetch } from '../../lib/apiFetch';
 import { useModalA11y } from '../../lib/useModalA11y';
+import { friendlyError } from '../../lib/friendlyError';
 
 const lagosFormatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Africa/Lagos',
@@ -166,7 +167,7 @@ export const PendingAgentsView: React.FC = () => {
         setListState('ready');
       } catch (err) {
         if (seq !== requestSeq.current) return;
-        setListError(err instanceof Error ? err.message : 'Could not reach the server.');
+        setListError(friendlyError(err, 'load the agent list'));
         setListState('error');
       }
     },
@@ -322,7 +323,7 @@ export const PendingAgentsView: React.FC = () => {
         setActionSuccessMessage(null);
       }, 5000);
     } catch (err: any) {
-      setActionErrorMessage(err.message || 'Action could not be completed. Please check network connection.');
+      setActionErrorMessage(friendlyError(err, 'complete the agent action'));
     } finally {
       setIsSubmittingAction(false);
     }

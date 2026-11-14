@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowClockwise } from '@phosphor-icons/react';
 import { apiFetch } from '../../lib/apiFetch';
+import { friendlyError } from '../../lib/friendlyError';
 
 interface AccessLog {
   id: string;
@@ -44,7 +45,7 @@ export const AdminSignInLog: React.FC = () => {
       setLogs(data as AccessLog[]);
       setState('ready');
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'The sign-in log could not be loaded.');
+      setMessage(friendlyError(err, 'load the sign-in log'));
       setState('error');
     }
   }, []);

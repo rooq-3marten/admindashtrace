@@ -2429,7 +2429,7 @@ function runServerSentinelCronScan() {
         documentTitle: doc.title,
         category: doc.category,
         certificateNumber: doc.certificate_number,
-        batchNumber: batchKey,
+        batchNumber: doc.entity_id,
         vesselName: voyage.vessel,
         containerId: voyage.container,
         destinationPort: voyage.destination,

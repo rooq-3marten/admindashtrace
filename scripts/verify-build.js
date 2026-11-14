@@ -42,8 +42,9 @@ if (!hasJsBundle) {
   process.exit(1);
 }
 
-// 3. Verify data_store.json contains zero test/stress farmers
-if (fs.existsSync(dataStore)) {
+// 3. If a local data_store.json exists, make sure it contains no test/stress farmers
+const dataStoreChecked = fs.existsSync(dataStore);
+if (dataStoreChecked) {
   try {
     const ds = JSON.parse(fs.readFileSync(dataStore, 'utf8'));
     const farmers = Object.keys(ds.farmers || {});
@@ -59,19 +60,18 @@ if (fs.existsSync(dataStore)) {
   }
 }
 
-// 4. Generate build certification stamp
+// 4. Write a stamp that lists only the checks this script actually ran.
+// (The type-check is run separately with `npm run typecheck`; it is not part of this stamp.)
 const stamp = {
-  status: 'VERIFIED_CLEAN',
-  certifiedAt: new Date().toISOString(),
-  target: 'TraceHarvest Production Admin Portal',
-  safeguards: {
-    typeCheck: 'PASSED',
-    assetIntegrity: 'PASSED',
-    zeroTestFarmers: 'CERTIFIED',
+  checkedAt: new Date().toISOString(),
+  checks: {
+    indexHtmlPresent: true,
+    jsBundlePresent: true,
+    localDataStoreScanned: dataStoreChecked,
   },
   assetsCount: assetFiles.length,
 };
 
 fs.writeFileSync(path.join(distDir, 'build-verification.json'), JSON.stringify(stamp, null, 2) + '\n');
 
-console.log('✅ [Build Safeguard] Build certified successfully: all integrity checks PASSED.');
+console.log('✅ [Build Safeguard] Build output checks passed.');

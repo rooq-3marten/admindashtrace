@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode, useMemo, useCallback } from 'react';
 import {
   Farmer,
   PracticeLog,
@@ -344,7 +344,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [agents, documents.length]);
 
   // Bidirectional real-time sync with Express backend & field mobile app
+  // One refresh at a time: a slow response must not let new requests pile up behind it.
+  const syncInFlight = useRef(false);
+  const strengthInFlight = useRef(false);
+
   const syncWithMobileBackend = useCallback(async (isSilent = true) => {
+    if (syncInFlight.current) return;
+    syncInFlight.current = true;
     try {
       if (!isSilent) setIsSyncing(true);
       const [resStatus, resFarmers, resPractices, resAgents, resDocs, resFieldBatches] = await Promise.all([
@@ -419,21 +425,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.warn('Sync with mobile backend failed:', err);
       setLiveSyncStatus('OFFLINE');
     } finally {
+      syncInFlight.current = false;
       if (!isSilent) setIsSyncing(false);
     }
   }, []);
 
-  // Periodic automatic sync with mobile backend every 4 seconds & strength checks every 10 seconds
+  // Periodic automatic sync with the backend (15 s) and connection checks (30 s)
   useEffect(() => {
     if (!isAuthenticated) return; // nobody signed in: make no backend calls at all
     syncWithMobileBackend(true);
     checkConnectionStrength();
+    // Refresh every 15 s, and only while the tab is visible, to spare the server and the agents' data plans.
     const syncInterval = setInterval(() => {
-      syncWithMobileBackend(true);
-    }, 4000);
+      if (!document.hidden) syncWithMobileBackend(true);
+    }, 15000);
     const strengthInterval = setInterval(() => {
-      checkConnectionStrength();
-    }, 10000);
+      if (!document.hidden && !strengthInFlight.current) {
+        strengthInFlight.current = true;
+        checkConnectionStrength().finally(() => { strengthInFlight.current = false; });
+      }
+    }, 30000);
     return () => {
       clearInterval(syncInterval);
       clearInterval(strengthInterval);

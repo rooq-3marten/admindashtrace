@@ -8,6 +8,7 @@ import {
   Package,
   Users,
 } from '@phosphor-icons/react';
+import { friendlyError } from '../../lib/friendlyError';
 
 interface LandingPageProps {
   onSuccessLogin?: () => void;
@@ -32,7 +33,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSuccessLogin }) => {
       await signInWithGoogle();
       if (onSuccessLogin) onSuccessLogin();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Google sign-in could not be completed.');
+      setErrorMsg(friendlyError(err, 'sign in'));
     } finally {
       setIsSubmitting(false);
     }
