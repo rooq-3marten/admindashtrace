@@ -191,7 +191,7 @@ export const DocumentsVault: React.FC = () => {
         activeDocument.id,
         status,
         verifyNotes.trim() || undefined,
-        userProfile?.displayName || userProfile?.email || 'Chief Compliance Director'
+        userProfile?.displayName || userProfile?.email || 'Unattributed reviewer'
       );
       setActiveDocument((prev) =>
         prev
