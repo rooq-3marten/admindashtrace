@@ -18,6 +18,7 @@ import {
   Ship,
 } from 'lucide-react';
 import { DocumentExpirySentinelView } from './DocumentExpirySentinelView';
+import { practiceNeedsReview } from '../../utils/practiceReview';
 
 export const PhiSentinel: React.FC = () => {
   const { practices, updatePracticeRisk, stats } = useData();
@@ -64,7 +65,7 @@ export const PhiSentinel: React.FC = () => {
       } else if (filterStatus === 'CLEARED') {
         matchStatus = isCleared && p.risk_level === 'COMPLIANT';
       } else if (filterStatus === 'FLAGGED') {
-        matchStatus = p.risk_level === 'FLAGGED_HIGH_RISK' || !p.nafdac_approved;
+        matchStatus = practiceNeedsReview(p);
       }
 
       const q = searchQuery.toLowerCase().trim();
@@ -210,7 +211,7 @@ export const PhiSentinel: React.FC = () => {
           const safeHarvest = practice.safe_harvest_date_ms || applied + phiDays * 86400000;
           const countdown = getRemainingTime(safeHarvest);
           const isCleared = !countdown;
-          const isFlagged = practice.risk_level === 'FLAGGED_HIGH_RISK' || !practice.nafdac_approved;
+          const isFlagged = practiceNeedsReview(practice);
 
           return (
             <div
