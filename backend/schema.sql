@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- 2. Field Agents
 CREATE TABLE IF NOT EXISTS agents (
-    id VARCHAR(64) PRIMARY KEY, -- e.g. AGENT-NG-042
+    id VARCHAR(64) PRIMARY KEY, -- assigned when an agent is approved
     name VARCHAR(150) NOT NULL,
     phone VARCHAR(30) NOT NULL,
     email VARCHAR(255),
