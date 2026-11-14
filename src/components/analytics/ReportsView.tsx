@@ -1,6 +1,7 @@
 import React from 'react';
 import { useData } from '../../context/DataContext';
 import { BarChart3, FileText, Download, CheckCircle2, ShieldCheck, ExternalLink } from 'lucide-react';
+import { practiceNeedsReview, isChemicalPractice } from '../../utils/practiceReview';
 
 export const ReportsView: React.FC = () => {
   const { farmers, batches, practices } = useData();
@@ -46,7 +47,7 @@ export const ReportsView: React.FC = () => {
         report_id: 'REP-2026-NAFDAC',
         standard: 'NAFDAC Pesticide Residue & Pre-Harvest Interval Protocol',
         practices_screened: practices.length,
-        prohibited_substances_detected: practices.filter((p) => !p.nafdac_approved).length,
+        prohibited_substances_detected: practices.filter((p) => isChemicalPractice(p) && !p.nafdac_approved).length,
         cleared_entries: practices.filter((p) => p.phi_cleared && p.nafdac_approved).length,
         practices: practices.map((p) => ({
           farmer_code: p.farmer_code,
