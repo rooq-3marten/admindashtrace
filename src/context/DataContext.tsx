@@ -36,6 +36,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { computeSha256 } from '../utils/crypto';
 import { apiFetch } from '../lib/apiFetch';
 import { useAuth } from './AuthContext';
+import { practiceNeedsReview } from '../utils/practiceReview';
 
 interface DataContextType {
   farmers: Farmer[];
@@ -490,7 +491,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }).length;
 
     const flaggedPractices = practices.filter(
-      (p) => !p.nafdac_approved || p.risk_level === 'FLAGGED_HIGH_RISK'
+      (p) => practiceNeedsReview(p)
     ).length;
 
     const totalBatches = batches.length;
