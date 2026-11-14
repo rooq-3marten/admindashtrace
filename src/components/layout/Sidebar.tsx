@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'farmers' as TabType, label: 'Farmers Enrolled', icon: Users, badge: stats.totalFarmers > 0 ? `${stats.totalFarmers}` : undefined, badgeType: 'count' },
         { id: 'phi_sentinel' as TabType, label: 'Practice Logs', icon: FileText, badge: stats.activePhiHolds > 0 ? `${stats.activePhiHolds} PHI` : undefined, badgeType: 'warning' },
         { id: 'batches' as TabType, label: 'Export Batches', icon: Package, badge: pendingBatchesCount > 0 ? `${pendingBatchesCount}` : undefined, badgeType: 'warning' },
-        { id: 'documents' as TabType, label: 'Customs Vault', icon: FileText, badge: pendingDocsCount > 0 ? `${pendingDocsCount} Review` : `${documents?.length || 0}`, badgeType: pendingDocsCount > 0 ? 'warning' : 'count' },
+        { id: 'documents' as TabType, label: 'Documents', icon: FileText, badge: pendingDocsCount > 0 ? `${pendingDocsCount} Review` : `${documents?.length || 0}`, badgeType: pendingDocsCount > 0 ? 'warning' : 'count' },
         { id: 'shipments' as TabType, label: 'Maritime Cargo', icon: Truck, badge: stats.totalShipmentsInTransit > 0 ? `${stats.totalShipmentsInTransit}` : undefined, badgeType: 'count' },
         { id: 'gis_map' as TabType, label: 'GIS Farm Plots', icon: MapPin, badge: 'EUDR', badgeType: 'eudr' },
         { id: 'eudr_engine' as TabType, label: 'EUDR Engine', icon: Tree, badge: 'Annex II', badgeType: 'eudr' },
